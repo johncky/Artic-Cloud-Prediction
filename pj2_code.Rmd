@@ -30,6 +30,8 @@ col_name = c("Y","X","Label","NDAI","SD","CORR","Rad_Df",
 colnames(img1) = col_name
 colnames(img2) = col_name
 colnames(img3) = col_name
+
+full_img = rbind(img1, img2, img3)
 ```
 
 ```{r}
@@ -102,7 +104,7 @@ img3 %>%
 # EDA
 ```{r}
 col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
-img1 %>% select(-c(X,Y,Label)) %>% cor() %>%
+full_img %>% select(-c(X,Y,Label)) %>% cor() %>%
   corrplot::corrplot(method="color", col=col(200),  
      diag=T,  tl.srt=45, tl.col = 'black', tl.cex = 0.75,mar=c(0,0,2,0),
      type="upper", order="hclust", 
@@ -112,12 +114,33 @@ img1 %>% select(-c(X,Y,Label)) %>% cor() %>%
 ```
 
 ```{r}
-img1 %>% select(-c(X,Y,Label)) %>% pairs(lower.panel = NULL)
+# full_img %>% select(NDAI, SD, CORR) %>% pairs(lower.panel = NULL)
+#full_img %>% select(contains('Rad')) %>% ggpairs(upper=NULL)
+# full_img %>%  ggpairs()
 ```
 
 ```{r}
-cbind(img1, img2, img3)
+plot_data = full_img %>% 
+  filter(Label != 0) %>%
+  mutate(Label = ifelse(Label==1, 'Cloudy', 'Cloud-free'))
+
+p1 = plot_data%>%
+  ggplot() + geom_density(aes(x=CORR, fill=Label), alpha=0.5) 
+p2 = plot_data%>%
+  ggplot() + geom_density(aes(x=NDAI, fill=Label), alpha=0.5) 
+p3 = plot_data%>%
+  ggplot() + geom_density(aes(x=log(SD), fill=Label), alpha=0.5) 
+p4 = plot_data%>%
+  ggplot() + geom_density(aes(x=Rad_Df, fill=Label), alpha=0.5) 
+
+p1 + p2 + p3 + p4 + plot_layout(nrow=2, guides = "collect") + 
+  plot_annotation(title = 'Density of Features By Label',
+                  theme=theme(plot.title = element_text(hjust = 0.5))) 
 ```
+
+
+
+
 
 
 
