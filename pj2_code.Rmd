@@ -55,7 +55,9 @@ tbl3= img3 %>% group_by(Label) %>% count() %>%
 tbl1 %>% left_join(tbl2, by='Label') %>% left_join(tbl3, by='Label') %>%
   mutate(Label=ifelse(Label==1, 'Cloudy (1)', ifelse(Label==-1, 'Cloud-free (-1)', 'Unlabeled (0)')))%>%
   arrange(Label)%>%
-  kbl(caption = "Pixels By Label (%)") %>%
+  kbl(caption = "<center><strong>Pixels By Label (%)<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
   kable_classic(full_width = F, html_font = "Cambria")
 ```
 
@@ -114,9 +116,14 @@ full_img %>% select(-c(X,Y,Label)) %>% cor() %>%
 ```
 
 ```{r}
-# full_img %>% select(NDAI, SD, CORR) %>% pairs(lower.panel = NULL)
-#full_img %>% select(contains('Rad')) %>% ggpairs(upper=NULL)
-# full_img %>%  ggpairs()
+tbl_data = full_img %>% filter(Label!=0) %>% cor() %>% .[-c(1,2,3),3] %>% round(.,2)
+
+data.frame('value'=tbl_data) %>% arrange(desc(value))%>%kbl(
+  caption = "<center><strong>Correlation with Label<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:25%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
 ```
 
 ```{r}
@@ -131,12 +138,53 @@ p2 = plot_data%>%
 p3 = plot_data%>%
   ggplot() + geom_density(aes(x=log(SD), fill=Label), alpha=0.5) 
 p4 = plot_data%>%
-  ggplot() + geom_density(aes(x=Rad_Df, fill=Label), alpha=0.5) 
+  ggplot() + geom_density(aes(x=Rad_Af, fill=Label), alpha=0.5) 
 
 p1 + p2 + p3 + p4 + plot_layout(nrow=2, guides = "collect") + 
   plot_annotation(title = 'Density of Features By Label',
                   theme=theme(plot.title = element_text(hjust = 0.5))) 
 ```
+
+## Two-sample Kolmogorov–Smirnov statistics
+```{r}
+full_img_cloudy = full_img %>% filter(Label==1)
+full_img_not_cloudy = full_img %>% filter(Label==-1)
+
+var_names = full_img %>% select(-c(X, Y, Label)) %>% colnames() 
+KS_stat = matrix(nrow=length(var_names))
+rownames(KS_stat) = var_names
+colnames(KS_stat) = 'Statistics'
+
+for (var in var_names){
+  cloudy_density = full_img_cloudy %>% select(var) %>% as.matrix()%>% density()
+  not_cloudy_density = full_img_not_cloudy %>% select(var)%>% as.matrix()%>% density()
+  min_x = min(cloudy_density$x , not_cloudy_density$x)
+  max_x = max(cloudy_density$x , not_cloudy_density$x)
+  cloudy_density = full_img_cloudy %>% select(var) %>% as.matrix()%>% 
+    density(from=min_x, to=max_x)
+  not_cloudy_density = full_img_not_cloudy %>% select(var)%>% as.matrix()%>%
+    density(from=min_x, to=max_x)
+  
+  x_diff = not_cloudy_density$x %>% diff() %>% .[1]
+  KS = tibble(x=cloudy_density$x, cloudy=cloudy_density$y, not_cloudy= not_cloudy_density$y)%>%
+    mutate(cloudy = cumsum(cloudy *x_diff),
+           not_cloudy= cumsum(not_cloudy *x_diff))%>%
+    mutate(diff = abs(cloudy - not_cloudy))%>%
+    select(diff)%>%max()
+  KS_stat[var,1] = KS
+}
+KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
+  caption = "<center><strong>Two-sample K-S Test: cloudy VS cloud-free<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:45%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
+```
+
+```{r}
+
+```
+
 
 
 
