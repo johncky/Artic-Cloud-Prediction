@@ -1,0 +1,135 @@
+---
+title: "proj2"
+author: "Kwong Yu Chong, Jiahua Wang"
+date: "2022-11-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+require(tidyverse)
+require(kableExtra)
+require(patchwork)
+require(GGally)
+require(corrplot)
+```
+
+# Read Data
+```{r}
+img1 = read.table("imagem1.txt")
+img2 = read.table("imagem2.txt")
+img3 = read.table("imagem3.txt")
+```
+
+```{r}
+col_name = c("Y","X","Label","NDAI","SD","CORR","Rad_Df",
+             "Rad_Cf","Rad_Bf","Rad_Af","Rad_An")
+colnames(img1) = col_name
+colnames(img2) = col_name
+colnames(img3) = col_name
+```
+
+```{r}
+img1 %>% head()
+```
+
+# Summarize the data
+
+###  % pixcel by label
+```{r}
+tbl1= img1 %>% group_by(Label) %>% count() %>%
+  ungroup() %>% 
+  mutate(Image1 = round(n / sum(n)*100,1)) %>% select(Label, Image1)
+tbl2= img2 %>% group_by(Label) %>% count() %>%
+  ungroup() %>% 
+  mutate(Image2 = round(n / sum(n)*100,1)) %>% select(Label, Image2)
+tbl3= img3 %>% group_by(Label) %>% count() %>%
+  ungroup() %>% 
+  mutate(Image3 = round(n / sum(n)*100,1)) %>% select(Label, Image3)
+
+tbl1 %>% left_join(tbl2, by='Label') %>% left_join(tbl3, by='Label') %>%
+  mutate(Label=ifelse(Label==1, 'Cloudy (1)', ifelse(Label==-1, 'Cloud-free (-1)', 'Unlabeled (0)')))%>%
+  arrange(Label)%>%
+  kbl(caption = "Pixels By Label (%)") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+
+### Plot Maps
+```{r}
+img1 %>% 
+  mutate(Label=
+           as.factor(ifelse(Label==1, 'Cloudy (1)',
+                  ifelse(Label==-1, 'Cloud-free (-1)',
+                         'Unlabeled (0)')))) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=Label)) +
+  scale_fill_manual(values=c("Cloudy (1)"='white', 
+                             'Cloud-free (-1)'='grey',
+                             'Unlabeled (0)'='black'))+
+  labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+
+img2 %>% 
+  mutate(Label=
+           as.factor(ifelse(Label==1, 'Cloudy (1)',
+                  ifelse(Label==-1, 'Cloud-free (-1)',
+                         'Unlabeled (0)')))) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=Label)) +
+  scale_fill_manual(values=c("Cloudy (1)"='white', 
+                             'Cloud-free (-1)'='grey',
+                             'Unlabeled (0)'='black'))+
+  labs(title='Image 2 Label', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+
+img3 %>% 
+  mutate(Label=
+           as.factor(ifelse(Label==1, 'Cloudy (1)',
+                  ifelse(Label==-1, 'Cloud-free (-1)',
+                         'Unlabeled (0)')))) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=Label)) +
+  scale_fill_manual(values=c("Cloudy (1)"='white', 
+                             'Cloud-free (-1)'='grey',
+                             'Unlabeled (0)'='black'))+
+  labs(title='Image 3 Label', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5),legend.position="none")
+```
+
+# EDA
+```{r}
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+img1 %>% select(-c(X,Y,Label)) %>% cor() %>%
+  corrplot::corrplot(method="color", col=col(200),  
+     diag=T,  tl.srt=45, tl.col = 'black', tl.cex = 0.75,mar=c(0,0,2,0),
+     type="upper", order="hclust", 
+     title='Feature Correlation', 
+         addCoef.col = "black",  outline=T,
+         )
+```
+
+```{r}
+img1 %>% select(-c(X,Y,Label)) %>% pairs(lower.panel = NULL)
+```
+
+```{r}
+cbind(img1, img2, img3)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
