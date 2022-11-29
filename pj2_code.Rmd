@@ -31,24 +31,28 @@ colnames(img1) = col_name
 colnames(img2) = col_name
 colnames(img3) = col_name
 
+img1$image = 1
+img2$image = 2
+img3$image = 3
+
 full_img = rbind(img1, img2, img3)
 ```
 
 ```{r}
-img1 %>% head()
+full_img %>% head()
 ```
 
 # Summarize the data
 
 ###  % pixcel by label
 ```{r}
-tbl1= img1 %>% group_by(Label) %>% count() %>%
+tbl1= full_img %>% filter(image==1) %>% group_by(Label) %>% count() %>%
   ungroup() %>% 
   mutate(Image1 = round(n / sum(n)*100,1)) %>% select(Label, Image1)
-tbl2= img2 %>% group_by(Label) %>% count() %>%
+tbl2= full_img %>% filter(image==2) %>% group_by(Label) %>% count() %>%
   ungroup() %>% 
   mutate(Image2 = round(n / sum(n)*100,1)) %>% select(Label, Image2)
-tbl3= img3 %>% group_by(Label) %>% count() %>%
+tbl3= full_img %>% filter(image==3) %>% group_by(Label) %>% count() %>%
   ungroup() %>% 
   mutate(Image3 = round(n / sum(n)*100,1)) %>% select(Label, Image3)
 
@@ -63,7 +67,7 @@ tbl1 %>% left_join(tbl2, by='Label') %>% left_join(tbl3, by='Label') %>%
 
 ### Plot Maps
 ```{r}
-img1 %>% 
+full_img %>% filter(image==1) %>% 
   mutate(Label=
            as.factor(ifelse(Label==1, 'Cloudy (1)',
                   ifelse(Label==-1, 'Cloud-free (-1)',
@@ -76,7 +80,7 @@ img1 %>%
   labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
    theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 
-img2 %>% 
+full_img %>% filter(image==2) %>% 
   mutate(Label=
            as.factor(ifelse(Label==1, 'Cloudy (1)',
                   ifelse(Label==-1, 'Cloud-free (-1)',
@@ -89,7 +93,7 @@ img2 %>%
   labs(title='Image 2 Label', x='X-coordinate', y='Y-coordinate')+
    theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 
-img3 %>% 
+full_img %>% filter(image==3) %>% 
   mutate(Label=
            as.factor(ifelse(Label==1, 'Cloudy (1)',
                   ifelse(Label==-1, 'Cloud-free (-1)',
@@ -106,7 +110,7 @@ img3 %>%
 # EDA
 ```{r}
 col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
-full_img %>% select(-c(X,Y,Label)) %>% cor() %>%
+full_img %>% select(-c(X,Y,Label, image)) %>% cor() %>%
   corrplot::corrplot(method="color", col=col(200),  
      diag=T,  tl.srt=45, tl.col = 'black', tl.cex = 0.75,mar=c(0,0,2,0),
      type="upper", order="hclust", 
@@ -116,7 +120,7 @@ full_img %>% select(-c(X,Y,Label)) %>% cor() %>%
 ```
 
 ```{r}
-tbl_data = full_img %>% filter(Label!=0) %>% cor() %>% .[-c(1,2,3),3] %>% round(.,2)
+tbl_data = full_img %>% select(-image)%>% filter(Label!=0) %>% cor() %>% .[-c(1,2,3),3] %>% round(.,2)
 
 data.frame('value'=tbl_data) %>% arrange(desc(value))%>%kbl(
   caption = "<center><strong>Correlation with Label<center><strong>",
@@ -147,10 +151,10 @@ p1 + p2 + p3 + p4 + plot_layout(nrow=2, guides = "collect") +
 
 ## Two-sample Kolmogorov–Smirnov statistics
 ```{r}
-full_img_cloudy = full_img %>% filter(Label==1)
-full_img_not_cloudy = full_img %>% filter(Label==-1)
+full_img_cloudy = full_img %>% select(-image)%>%filter(Label==1)
+full_img_not_cloudy = full_img %>% select(-image)%>% filter(Label==-1)
 
-var_names = full_img %>% select(-c(X, Y, Label)) %>% colnames() 
+var_names = full_img %>% select(-c(X, Y, Label, image)) %>% colnames() 
 KS_stat = matrix(nrow=length(var_names))
 rownames(KS_stat) = var_names
 colnames(KS_stat) = 'Statistics'
@@ -181,9 +185,125 @@ KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
   kable_classic(full_width = T, html_font = "Cambria",) 
 ```
 
+## PCA
+Removed unlabeled data
 ```{r}
+pca_data = full_img %>%select(-c(X,Y,Label, image))
+pca = prcomp(pca_data, scale.  =T)
+explained_var = (pca$sdev^2) %>% cumsum()
+explained_var = round(explained_var / explained_var[8]*100,1)
+
+ggplot()+
+  geom_point(aes(x=seq(1,8), y=pca$sdev^2))+
+  geom_line(aes(x=seq(1,8), y=pca$sdev^2))+
+  labs(x='PC', y='Variance', title='Screeplot')
+```
+
+*PC1 is mostly radiance variables. Look at principal direction.
+```{r}
+full_pca = tibble(data.frame(pca$x))
+full_pca$X = full_img$X
+full_pca$Y = full_img$Y
+full_pca$Label = ifelse(full_img$Label==1,'Cloudy',ifelse(full_img$Label==-1,'Cloud-free',
+                                                               'Unlabeled'))
+full_pca$image = full_img$image
+
+
+p1 = full_pca%>% filter(Label!='Unlabeled')%>%ggplot()+
+  geom_density(aes(x=PC1, fill=Label), alpha=0.3)+
+  labs(title=paste0('PC1(',explained_var[1],'%)'), y='Density', x='')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
+p2 = full_pca%>% filter(Label!='Unlabeled')%>%ggplot()+
+  geom_density(aes(x=PC2, fill=Label), alpha=0.3)+
+  labs(title =paste0('PC2 (',explained_var[2]-explained_var[1],'%)'), y='Density', x='')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+p3=full_pca %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=PC1)) +
+  #labs(title='Image 1: PC1', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+
+p4=full_pca %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=PC2)) +
+  #labs(title='Image 1: PC2', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+
+
+
+
+p1 + p2 + p3+p4+plot_layout(nrow=2, guides = "collect")
+```
+
+
+
+```{r}
+full_PC = data.frame(pca$x) %>% as.tibble() %>% mutate(Label=full_img$Label)
+full_PC_cloudy = full_PC %>% filter(Label==1)
+full_PC_not_cloudy = full_PC %>% filter(Label==-1)
+
+var_names = full_PC %>% select(-Label)%>% colnames() 
+KS_stat = matrix(nrow=length(var_names))
+rownames(KS_stat) = var_names
+colnames(KS_stat) = 'Statistics'
+
+for (var in var_names){
+  cloudy_density = full_PC_cloudy %>% select(var) %>% as.matrix()%>% density()
+  not_cloudy_density = full_PC_not_cloudy %>% select(var)%>% as.matrix()%>% density()
+  min_x = min(cloudy_density$x , not_cloudy_density$x)
+  max_x = max(cloudy_density$x , not_cloudy_density$x)
+  cloudy_density = full_PC_cloudy %>% select(var) %>% as.matrix()%>% 
+    density(from=min_x, to=max_x)
+  not_cloudy_density = full_PC_not_cloudy %>% select(var)%>% as.matrix()%>%
+    density(from=min_x, to=max_x)
+  
+  x_diff = not_cloudy_density$x %>% diff() %>% .[1]
+  KS = tibble(x=cloudy_density$x, cloudy=cloudy_density$y, not_cloudy= not_cloudy_density$y)%>%
+    mutate(cloudy = cumsum(cloudy *x_diff),
+           not_cloudy= cumsum(not_cloudy *x_diff))%>%
+    mutate(diff = abs(cloudy - not_cloudy))%>%
+    select(diff)%>%max()
+  KS_stat[var,1] = KS
+}
+KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
+  caption = "<center><strong>Two-sample K-S Test: cloudy VS cloud-free<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:45%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
 
 ```
+
+
+
+```{r}
+img1 %>% 
+  mutate(Label=
+           as.factor(ifelse(Label==1, 'Cloudy (1)',
+                  ifelse(Label==-1, 'Cloud-free (-1)',
+                         'Unlabeled (0)')))) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=Label)) +
+  scale_fill_manual(values=c("Cloudy (1)"='white', 
+                             'Cloud-free (-1)'='grey',
+                             'Unlabeled (0)'='black'))+
+  labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+
+ggplot() + geom_raster(aes(x=img1, y=Y, color=pca$x[,1]))
+```
+
+
+
+# Preparation: Data Splitting
+Performance might be affected by spatial autocorrelation.
+
+## First Method: 
 
 
 
