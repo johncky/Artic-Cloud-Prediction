@@ -278,7 +278,7 @@ KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
   kable_classic(full_width = T, html_font = "Cambria",) 
 
 ```
-
+We will likely obtain better classification result using the original author-defined variables: NDAI, CORR, SD than the PCs.
 
 
 ```{r}
