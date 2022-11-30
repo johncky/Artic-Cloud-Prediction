@@ -39,7 +39,7 @@ full_img = rbind(img1, img2, img3)
 ```
 
 ```{r}
-full_img %>% head()
+full_img %>% head() 
 ```
 
 # Summarize the data
@@ -352,16 +352,43 @@ Performance might be affected by spatial autocorrelation.
 
 ## Second Method: KMeans
 ```{r}
-image1_kmean <- kmeans(full_img %>% filter(image == 1) %>% select(Y,X) ,4)
-image2_kmean <- kmeans(full_img %>% filter(image == 2) %>% select(Y,X) ,4)
-image3_kmean <- kmeans(full_img %>% filter(image == 3) %>% select(Y,X) ,4)
-cluster_num <- c(image1_kmean$cluster, image2_kmean$cluster + 4, image3_kmean$cluster + 8)
-full_img <- full_img %>% mutate(cluster_num = cluster_num)
-sets <- split(sample(1:12), rep(1:3, c(2,2,8)))
-training <- full_img %>% filter(cluster_num %in% sets$`3`)
-valid <- full_img %>% filter(cluster_num %in% sets$`2`)
-test <- full_img %>% filter(cluster_num %in% sets$`1`)
-training
+
+Kmeans_block_split = function(data, K){
+  idx = vector(mode = 'list',length = K)
+  res = kmeans(data %>%  select(Y,X) ,K)
+  for (i in 1:K){
+    idx[[i]] = which(res$cluster == i)
+  }
+  return (idx)
+}
+
+
+
+# image1_kmean <- kmeans(full_img %>% filter(image == 1) %>% select(Y,X) ,4)
+# image2_kmean <- kmeans(full_img %>% filter(image == 2) %>% select(Y,X) ,4)
+# image3_kmean <- kmeans(full_img %>% filter(image == 3) %>% select(Y,X) ,4)
+# cluster_num <- c(image1_kmean$cluster, image2_kmean$cluster + 4, image3_kmean$cluster + 8)
+# full_img <- full_img %>% mutate(cluster_num = cluster_num)
+# sets <- split(sample(1:12), rep(1:3, c(2,2,8)))
+# training <- full_img %>% filter(cluster_num %in% sets$`3`)
+# valid <- full_img %>% filter(cluster_num %in% sets$`2`)
+# test <- full_img %>% filter(cluster_num %in% sets$`1`)
+# training
+
+full_img_copy = rbind(full_img)
+res = Kmeans_block_split(full_img, 12)
+full_img_copy['block'] = NA
+
+for (i in 1:12){
+  full_img_copy[res[[i]],'block'] = i
+}
+
+
+full_img_copy %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=block)) +
+  labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 ```
 
 
