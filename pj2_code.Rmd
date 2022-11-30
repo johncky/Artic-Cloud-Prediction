@@ -15,7 +15,8 @@ require(kableExtra)
 require(patchwork)
 require(GGally)
 require(corrplot)
-library(RColorBrewer)
+require(RColorBrewer)
+require(tidymodels)
 ```
 
 # Read Data
@@ -417,11 +418,11 @@ plot_kmean_block = function(data, K, img){
     theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 }
 set.seed(12345)
-plot_kmean_block(full_img, 3, 1)
+plot_kmean_block(full_img , 3, 1)
 ```
-
+## Split data into Train / Validation / Test
 ```{r}
-set.seed(4444)
+set.seed(666)
 
 create_kmeans_split = function(data){
   idx = Kmeans_block_split(data,3)
@@ -473,12 +474,12 @@ create_block_split = function(data){
 }
 
 
-kmeans_split = create_kmeans_split(full_img)
-bk_split = create_block_split(full_img)
+kmeans_split = create_kmeans_split(full_img %>% filter(Label!=0))
+bk_split = create_block_split(full_img%>% filter(Label!=0))
 ```
 
 ```{r}
-N = full_img %>% dim() %>% .[1]
+N = full_img %>% filter(Label!=0) %>% dim() %>% .[1]
 k_train_pct = (kmeans_split$train %>%dim() %>% .[1]) / N
 k_val_pct = (kmeans_split$val %>%dim() %>% .[1]) / N
 k_test_pct = (kmeans_split$test %>%dim() %>% .[1]) / N
@@ -501,20 +502,21 @@ tbl_data = data.frame(split_ratio * 100 ) %>% round(.,1)
 colnames(tbl_data) = c('K means', 'Block split')
 rownames(tbl_data) = c('Train', 'Test', 'Validation')
 tbl_data %>%kbl(
-  caption = "<center><strong>Data Split Ratio<center><strong>",
+  caption = "<center><strong>Data Split Ratio Excluding Unlabeled Points<center><strong>",
   escape = FALSE,
   format = 'html',
   table.attr = "style='width:45%;'") %>%
   kable_classic(full_width = T, html_font = "Cambria",) 
 
 ```
-## Baseline
-```{r}
-kmeans_valid_accuracy <- mean((kmeans_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
-kmeans_test_accuracy <- mean((kmeans_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
 
-block_valid_accuracy <- mean((bk_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
-block_test_accuracy <- mean((bk_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
+## Baseline Accuracy
+```{r}
+kmeans_valid_accuracy <- mean((kmeans_split$val  %>% pull(Label) )== -1)
+kmeans_test_accuracy <- mean((kmeans_split$test %>% pull(Label) )== -1)
+
+block_valid_accuracy <- mean((bk_split$val %>% pull(Label) )== -1)
+block_test_accuracy <- mean((bk_split$test %>% pull(Label) )== -1)
 
 kmeans_test_accuracy
 kmeans_valid_accuracy
@@ -524,6 +526,64 @@ block_valid_accuracy
 
 ```
 Such a trivial classifier will have high average accuracy if the image itself is mainly cloud-free.
+
+## First order Importance
+
+### K means block split: Logistic Regression
+```{r}
+variable_names = full_img %>% select(-c(X, Y, Label, image)) %>% colnames()
+lr_model = logistic_reg() %>% set_engine('glm')
+
+Ktrain_data = kmeans_split$train %>% filter(Label!=0) %>% mutate(Label = as.factor(ifelse(Label==1, 'Cloudy', 'Cloudfree')))
+Kvalid_data = kmeans_split$val %>% filter(Label!=0) %>% mutate(Label = as.factor(ifelse(Label==1, 'Cloudy', 'Cloudfree')))
+
+Blocktrain_data = bk_split$train %>% filter(Label!=0) %>% mutate(Label = as.factor(ifelse(Label==1, 'Cloudy', 'Cloudfree')))
+Blockvalid_data = bk_split$val %>% filter(Label!=0) %>% mutate(Label = as.factor(ifelse(Label==1, 'Cloudy', 'Cloudfree')))
+
+res = matrix(NA, nrow=length(variable_names), ncol = 3)
+rownames(res) = variable_names
+colnames(res) = c('AUC: K-means split', 'AUC: Block split', 'AUC: Avg')
+  
+coeffs = matrix(NA, nrow=length(variable_names), ncol = 3)
+rownames(coeffs) = variable_names
+colnames(coeffs) = c('Beta: K-means split', 'Beta: Block split', 'Beta: Avg')
+
+for (var in variable_names){
+  lr_recipe = recipe(as.formula(paste0('Label ~ ', var)), data = train_data) %>%  step_normalize(all_numeric_predictors())
+  lr_work = workflow() %>% add_model(lr_model) %>% add_recipe(lr_recipe)
+  lr_fit = lr_work %>% fit(data = Ktrain_data)
+  lr_perf = lr_fit %>% augment(new_data = Kvalid_data) %>%
+    select(Label, starts_with('.pred')) 
+  res[var,1] = lr_perf %>% roc_auc(Label, .pred_Cloudfree) %>% pull(.estimate)
+  coeffs[var,1] = broom::tidy(lr_fit) %>% pull(estimate)%>%.[2]
+  
+  lr_fit = lr_work %>% fit(data = Ktrain_data)
+  lr_perf = lr_fit %>% augment(new_data = Blockvalid_data) %>%
+    select(Label, starts_with('.pred')) 
+  res[var,2] = lr_perf %>% roc_auc(Label, .pred_Cloudfree) %>% pull(.estimate)
+  coeffs[var,2] = broom::tidy(lr_fit) %>% pull(estimate)%>%.[2]
+  
+  res[var,3] = res[var,1]/2 + res[var,2]/2
+  coeffs[var,3] = coeffs[var,1]/2 + coeffs[var,2]/2
+}
+
+(res*100) %>% round(.,1) %>% as.data.frame() %>% arrange(desc('AUC: Avg')) %>% kbl(
+  caption = "<center><strong>Logistic Regression Performance<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:50%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
+```
+
+```{r}
+coeffs %>% round(.,2) %>% as.data.frame() %>% arrange(desc('Beta: Avg')) %>% kbl(
+  caption = "<center><strong>Logistic Regression Coefficient Estimate<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:50%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
+```
+AUC is highly variable on randomization seed, which changes the Train-Validation split. However, NDAI still outperforms under most of the cases.
 
 
 
