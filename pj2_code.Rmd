@@ -15,6 +15,7 @@ require(kableExtra)
 require(patchwork)
 require(GGally)
 require(corrplot)
+library(RColorBrewer)
 ```
 
 # Read Data
@@ -345,7 +346,43 @@ Performance might be affected by spatial autocorrelation.
 
 ## First Method: Blocking
 ```{r}
+block_split = function(data, K){
+  N =data %>% dim() %>% .[1]
+  fold_n = round(N/ K)
+  remainder = N - (K-1) * fold_n
+  block_id = rep(1:(K-1), each= fold_n)
+  block_id = c(block_id, rep(K, remainder))
+  data['idx'] = 1:(dim(data)[1])
+  data = data %>% arrange(X, Y)
+  data['block']= block_id
+  
+  idx = vector(mode = 'list',length = K)
+  for (i in 1:K){
+    idx[[i]] = data %>% filter(block==i) %>% pull(idx) 
+  }
+  return(idx)
+}
 
+plot_block = function(data, K, img){
+  res = block_split(data, K)
+  
+  data['block'] = NA
+  for (i in 1:K){
+    data[res[[i]],'block'] = i
+  }
+  my.cols = brewer.pal(K, "Paired")
+  my.cols = c(my.cols, "white")
+  data %>% filter(image==img) %>% 
+    mutate(color = ifelse(Label!=0, block, 'Cloud-free'))%>%
+    ggplot() +
+    geom_raster(aes(x=X, y=Y, fill=color)) +
+    labs(title='Image 1: blocks', x='X-coordinate', y='Y-coordinate')+
+    scale_fill_manual(values=my.cols)+
+    theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+}
+
+
+plot_block(full_img, 3, 1)
 
 ```
 
@@ -361,22 +398,51 @@ Kmeans_block_split = function(data, K){
   return (idx)
 }
 
-
-full_img_copy = rbind(full_img)
-res = Kmeans_block_split(full_img, 12)
-full_img_copy['block'] = NA
-
-for (i in 1:12){
-  full_img_copy[res[[i]],'block'] = i
+plot_kmean_block = function(data, K, img){
+  data_copy = rbind(data)
+  res = Kmeans_block_split(data, K)
+  data_copy['block'] = NA
+  for (i in 1:K){
+    data_copy[res[[i]],'block'] = i
+  }
+  my.cols = brewer.pal(K, "Paired")
+  my.cols = c(my.cols, "white")
+  data_copy %>% filter(image==img) %>% 
+    mutate(color = ifelse(Label!=0, block, 'Cloud-free'))%>%
+    ggplot() +
+    geom_raster(aes(x=X, y=Y, fill=color)) +
+    labs(title='Image 1: K-means blocks', x='X-coordinate', y='Y-coordinate')+
+    scale_fill_manual(values=my.cols)+
+    theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 }
 
-
-full_img_copy %>% filter(image==1) %>% 
-  ggplot() +
-  geom_raster(aes(x=X, y=Y, fill=block)) +
-  labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
-   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
+plot_kmean_block(full_img, 3, 3)
 ```
+
+```{r}
+create_train_val_test = function(full_img){
+  image1_kmean <- kmeans(full_img %>% filter(image == 1) %>% select(Y,X) ,4)
+  image2_kmean <- kmeans(full_img %>% filter(image == 2) %>% select(Y,X) ,4)
+  image3_kmean <- kmeans(full_img %>% filter(image == 3) %>% select(Y,X) ,4)
+  cluster_num <- c(image1_kmean$cluster, image2_kmean$cluster + 4, image3_kmean$cluster + 8)
+  full_img <- full_img %>% mutate(cluster_num = cluster_num)
+  sets <- split(sample(1:12), rep(1:3, c(2,2,8)))
+  training <- full_img %>% filter(cluster_num %in% sets$`3`)
+  valid <- full_img %>% filter(cluster_num %in% sets$`2`)
+  test <- full_img %>% filter(cluster_num %in% sets$`1`)
+  
+  return(list(train = training, validation = valid, test = test))
+}
+full_split = create_train_val_test(full_img)
+
+```
+
+## Baseline
+```{r}
+valid_accuracy <- mean(valid$Label == -1)
+test_accuracy <- mean(test$Label == -1)
+```
+Such a trivial classifier will have high average accuracy if the image itself is mainly cloud-free.
 
 
 
