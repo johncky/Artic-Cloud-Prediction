@@ -199,6 +199,7 @@ ggplot()+
   geom_line(aes(x=seq(1,8), y=pca$sdev^2))+
   labs(x='PC', y='Variance', title='Screeplot')
 ```
+
 ```{r}
 pca
 
@@ -381,7 +382,7 @@ plot_block = function(data, K, img){
     theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 }
 
-
+set.seed(1234567)
 plot_block(full_img, 3, 1)
 
 ```
@@ -415,32 +416,78 @@ plot_kmean_block = function(data, K, img){
     scale_fill_manual(values=my.cols)+
     theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 }
-
-plot_kmean_block(full_img, 3, 3)
+set.seed(1234567)
+plot_kmean_block(full_img, 3, 1)
 ```
 
 ```{r}
-create_train_val_test = function(full_img){
-  image1_kmean <- kmeans(full_img %>% filter(image == 1) %>% select(Y,X) ,4)
-  image2_kmean <- kmeans(full_img %>% filter(image == 2) %>% select(Y,X) ,4)
-  image3_kmean <- kmeans(full_img %>% filter(image == 3) %>% select(Y,X) ,4)
-  cluster_num <- c(image1_kmean$cluster, image2_kmean$cluster + 4, image3_kmean$cluster + 8)
-  full_img <- full_img %>% mutate(cluster_num = cluster_num)
-  sets <- split(sample(1:12), rep(1:3, c(2,2,8)))
-  training <- full_img %>% filter(cluster_num %in% sets$`3`)
-  valid <- full_img %>% filter(cluster_num %in% sets$`2`)
-  test <- full_img %>% filter(cluster_num %in% sets$`1`)
-  
-  return(list(train = training, validation = valid, test = test))
-}
-full_split = create_train_val_test(full_img)
+set.seed(1234567)
 
+create_kmeans_split = function(data){
+  idx = Kmeans_block_split(data,3)
+  
+  for (i in 1:3){
+    data[idx[[i]],'block']=i
+  }
+  
+  unique_blocks = data %>% distinct(image, block)
+  block_n = unique_blocks %>% dim() %>% .[1]
+  val_test_samples = sample(1:block_n, 2)
+  
+  val_img_block = unique_blocks[val_test_samples[1], ]
+  test_img_block = unique_blocks[val_test_samples[2], ]
+  
+  return(list(train = data %>% 
+         filter(image!=val_img_block$image & block!=val_img_block$block) %>%
+         filter(image!=test_img_block$image & block!=test_img_block$block),
+       val = data %>% filter(image==val_img_block$image & block==val_img_block$block),
+       test = data %>% filter(image==test_img_block$image & block==test_img_block$block)))
+  
+}
+
+create_block_split = function(data){
+  idx = block_split(data,3)
+  
+  for (i in 1:3){
+    data[idx[[i]],'block']=i
+  }
+  
+  unique_blocks = data %>% distinct(image, block)
+  block_n = unique_blocks %>% dim() %>% .[1]
+  val_test_samples = sample(1:block_n, 2)
+  
+  val_img_block = unique_blocks[val_test_samples[1], ]
+  test_img_block = unique_blocks[val_test_samples[2], ]
+  
+  return(list(train = data %>% 
+         filter(image!=val_img_block$image & block!=val_img_block$block) %>%
+         filter(image!=test_img_block$image & block!=test_img_block$block),
+       val = data %>% filter(image==val_img_block$image & block==val_img_block$block),
+       test = data %>% filter(image==test_img_block$image & block==test_img_block$block)))
+  
+}
+
+
+kmeans_split = create_kmeans_split(full_img)
+block_split = create_block_split(full_img)
 ```
 
 ## Baseline
 ```{r}
-valid_accuracy <- mean((full_split$validation %>% filter(Label != 0) %>% pull(Label) )== -1)
-test_accuracy <- mean((full_split$test %>% filter(Label != 0) %>% pull(Label) )== -1)
+kmeans_valid_accuracy <- mean((kmeans_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
+kmeans_test_accuracy <- mean((kmeans_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
+
+block_valid_accuracy <- mean((block_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
+block_test_accuracy <- mean((block_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
+
+kmeans_test_accuracy
+kmeans_valid_accuracy
+
+block_valid_accuracy
+block_test_accuracy
+
+kmeans_split$test %>% summary()
+
 ```
 Such a trivial classifier will have high average accuracy if the image itself is mainly cloud-free.
 
