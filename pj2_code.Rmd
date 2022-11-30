@@ -198,8 +198,13 @@ ggplot()+
   geom_line(aes(x=seq(1,8), y=pca$sdev^2))+
   labs(x='PC', y='Variance', title='Screeplot')
 ```
+```{r}
+pca
 
+```
 *PC1 is mostly radiance variables. Look at principal direction.
+
+
 ```{r}
 full_pca = tibble(data.frame(pca$x))
 full_pca$X = full_img$X
@@ -338,8 +343,11 @@ We will likely obtain better classification result using the original author-def
 # Preparation: Data Splitting
 Performance might be affected by spatial autocorrelation.
 
-## First Method: 
+## First Method: Blocking
+```{r}
 
+
+```
 
 
 
