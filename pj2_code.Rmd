@@ -294,8 +294,6 @@ full_pca %>% select(-image)%>% filter(Label!="Unlabeled")%>%
   kable_classic(full_width = T, html_font = "Cambria",) 
 ```
 
-
-
 ```{r}
 full_PC = data.frame(pca$x) %>% as.tibble() %>% mutate(Label=full_img$Label)
 full_PC_cloudy = full_PC %>% filter(Label==1)
@@ -332,8 +330,9 @@ KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
   kable_classic(full_width = T, html_font = "Cambria",) 
 
 ```
-We will likely obtain better classification result using the original author-defined variables: NDAI, CORR, SD than the PCs.
+Hence, Author defined variables are the best for the classification task.\
 
+We will likely obtain better classification result using the original author-defined variables: NDAI, CORR, SD than the PCs.\
 
 
 # Preparation: Data Splitting
