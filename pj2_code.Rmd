@@ -439,8 +439,8 @@ full_split = create_train_val_test(full_img)
 
 ## Baseline
 ```{r}
-valid_accuracy <- mean(valid$Label == -1)
-test_accuracy <- mean(test$Label == -1)
+valid_accuracy <- mean((full_split$validation %>% filter(Label != 0) %>% pull(Label) )== -1)
+test_accuracy <- mean((full_split$test %>% filter(Label != 0) %>% pull(Label) )== -1)
 ```
 Such a trivial classifier will have high average accuracy if the image itself is mainly cloud-free.
 
