@@ -239,6 +239,60 @@ p4=full_pca %>% filter(image==1) %>%
 
 p1 + p2 + p3+p4+plot_layout(nrow=2, guides = "collect")
 ```
+```{r}
+p1=full_pca %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=PC2)) +
+  labs(title='Image 1: PC1', x='', y='')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none",
+         axis.text        = element_blank(),
+        axis.ticks       = element_blank(),
+        axis.title       = element_blank(),
+        panel.background = element_blank())
+
+
+p2=full_pca %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=PC2)) +
+  labs(title='Image 1: PC2', x='', y='')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none",
+         axis.text        = element_blank(),
+        axis.ticks       = element_blank(),
+        axis.title       = element_blank(),
+        panel.background = element_blank())
+p3 = full_img %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=NDAI)) +
+  labs(title='Image 1: NDAI', x='', y='')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none",
+         axis.text        = element_blank(),
+        axis.ticks       = element_blank(),
+        axis.title       = element_blank(),
+        panel.background = element_blank())
+p4 = full_img %>% filter(image==1) %>% 
+  ggplot() +
+  geom_raster(aes(x=X, y=Y, fill=SD)) +
+  labs(title='Image 1: SD', x='', y='')+
+   theme(plot.title = element_text(hjust = 0.5), legend.position="none",
+         axis.text        = element_blank(),
+        axis.ticks       = element_blank(),
+        axis.title       = element_blank(),
+        panel.background = element_blank())
+
+p1+p2+p3+p4 + plot_layout(nrow=2)
+```
+
+```{r}
+full_pca %>% select(-image)%>% filter(Label!="Unlabeled")%>% 
+  mutate(Label=ifelse(Label=='Cloudy', 1, -1)) %>%
+  cor() %>% .[1:8,11] %>% round(.,2) %>% 
+  data.frame('value'=.) %>% arrange(desc(value))%>%kbl(
+  caption = "<center><strong>Correlation with Label<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:25%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
+```
 
 
 
@@ -279,24 +333,6 @@ KS_stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
 
 ```
 We will likely obtain better classification result using the original author-defined variables: NDAI, CORR, SD than the PCs.
-
-
-```{r}
-img1 %>% 
-  mutate(Label=
-           as.factor(ifelse(Label==1, 'Cloudy (1)',
-                  ifelse(Label==-1, 'Cloud-free (-1)',
-                         'Unlabeled (0)')))) %>% 
-  ggplot() +
-  geom_raster(aes(x=X, y=Y, fill=Label)) +
-  scale_fill_manual(values=c("Cloudy (1)"='white', 
-                             'Cloud-free (-1)'='grey',
-                             'Unlabeled (0)'='black'))+
-  labs(title='Image 1 Label', x='X-coordinate', y='Y-coordinate')+
-   theme(plot.title = element_text(hjust = 0.5), legend.position="none")
-
-ggplot() + geom_raster(aes(x=img1, y=Y, color=pca$x[,1]))
-```
 
 
 
