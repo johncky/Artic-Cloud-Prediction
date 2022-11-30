@@ -416,12 +416,12 @@ plot_kmean_block = function(data, K, img){
     scale_fill_manual(values=my.cols)+
     theme(plot.title = element_text(hjust = 0.5), legend.position="none")
 }
-set.seed(1234567)
+set.seed(12345)
 plot_kmean_block(full_img, 3, 1)
 ```
 
 ```{r}
-set.seed(1234567)
+set.seed(4444)
 
 create_kmeans_split = function(data){
   idx = Kmeans_block_split(data,3)
@@ -437,11 +437,14 @@ create_kmeans_split = function(data){
   val_img_block = unique_blocks[val_test_samples[1], ]
   test_img_block = unique_blocks[val_test_samples[2], ]
   
-  return(list(train = data %>% 
-         filter(image!=val_img_block$image & block!=val_img_block$block) %>%
-         filter(image!=test_img_block$image & block!=test_img_block$block),
-       val = data %>% filter(image==val_img_block$image & block==val_img_block$block),
-       test = data %>% filter(image==test_img_block$image & block==test_img_block$block)))
+  val = data %>% filter(image==val_img_block$image & block==val_img_block$block)
+  test = data %>% filter(image==test_img_block$image & block==test_img_block$block)
+  train = data %>% setdiff(val) %>% setdiff(test)
+  
+  
+  return(list(val = val,
+              test = test,
+              train = train))
   
 }
 
@@ -459,34 +462,65 @@ create_block_split = function(data){
   val_img_block = unique_blocks[val_test_samples[1], ]
   test_img_block = unique_blocks[val_test_samples[2], ]
   
-  return(list(train = data %>% 
-         filter(image!=val_img_block$image & block!=val_img_block$block) %>%
-         filter(image!=test_img_block$image & block!=test_img_block$block),
-       val = data %>% filter(image==val_img_block$image & block==val_img_block$block),
-       test = data %>% filter(image==test_img_block$image & block==test_img_block$block)))
+  val = data %>% filter(image==val_img_block$image & block==val_img_block$block)
+  test = data %>% filter(image==test_img_block$image & block==test_img_block$block)
+  train = data %>% setdiff(val) %>% setdiff(test)
+
+  return(list(val = val,
+              test = test,
+              train = train))
   
 }
 
 
 kmeans_split = create_kmeans_split(full_img)
-block_split = create_block_split(full_img)
+bk_split = create_block_split(full_img)
 ```
 
+```{r}
+N = full_img %>% dim() %>% .[1]
+k_train_pct = (kmeans_split$train %>%dim() %>% .[1]) / N
+k_val_pct = (kmeans_split$val %>%dim() %>% .[1]) / N
+k_test_pct = (kmeans_split$test %>%dim() %>% .[1]) / N
+
+
+block_train_pct = (bk_split$train %>%dim() %>% .[1]) / N
+block_val_pct = (bk_split$val %>%dim() %>% .[1]) / N
+block_test_pct = (bk_split$test %>%dim() %>% .[1]) / N
+
+split_ratio = matrix(nrow = 3, ncol = 2)
+
+split_ratio[1,1] = k_train_pct
+split_ratio[2,1] = k_test_pct
+split_ratio[3,1] = k_val_pct
+split_ratio[1,2] = block_train_pct
+split_ratio[2,2] = block_test_pct
+split_ratio[3,2] = block_val_pct
+
+tbl_data = data.frame(split_ratio * 100 ) %>% round(.,1) 
+colnames(tbl_data) = c('K means', 'Block split')
+rownames(tbl_data) = c('Train', 'Test', 'Validation')
+tbl_data %>%kbl(
+  caption = "<center><strong>Data Split Ratio<center><strong>",
+  escape = FALSE,
+  format = 'html',
+  table.attr = "style='width:45%;'") %>%
+  kable_classic(full_width = T, html_font = "Cambria",) 
+
+```
 ## Baseline
 ```{r}
 kmeans_valid_accuracy <- mean((kmeans_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
 kmeans_test_accuracy <- mean((kmeans_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
 
-block_valid_accuracy <- mean((block_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
-block_test_accuracy <- mean((block_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
+block_valid_accuracy <- mean((bk_split$val %>% filter(Label!=0) %>% pull(Label) )== -1)
+block_test_accuracy <- mean((bk_split$test %>% filter(Label!=0) %>% pull(Label) )== -1)
 
 kmeans_test_accuracy
 kmeans_valid_accuracy
 
-block_valid_accuracy
 block_test_accuracy
-
-kmeans_split$test %>% summary()
+block_valid_accuracy
 
 ```
 Such a trivial classifier will have high average accuracy if the image itself is mainly cloud-free.
