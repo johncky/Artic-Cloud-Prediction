@@ -567,7 +567,66 @@ foi$coeffs %>% as.data.frame() %>% mutate(Variable=rownames(.)) %>% pivot_longer
 
 ## CVmaster
 ```{r}
-CVmaster = function()
+CVmaster = function(tidymodel, train_features, training_labels, K, loss_functions, split_func,
+                    .scale=T){
+  
+  # Columns to exclude: X, Y, Label, image. These are not features
+  excld_cols = train_features %>% colnames() %>% intersect(c('X', 'Y', 'image', 'Label'))
+  feature_names = train_features %>% select(-excld_cols) %>% colnames()
+  
+  # formula
+  formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
+  
+  # ensure label is factor
+  training_labels = training_labels %>% as.factor()
+  
+  cv_settings = list(v = K, strata = FALSE, repeats = 1)
+  resample_split = list()
+  fold_id = paste('Fold ', 1:K)
+  split_idx = split_func(train_features, K)
+  
+  full_train = train_features %>% mutate(Label=training_labels)
+  
+  # recipe
+  model_recipe = recipe(formula, data = full_train)
+    if (.scale){
+      model_recipe = model_recipe %>% step_normalize(all_numeric_predictors())
+    }
+
+  N = dim(train_features)[1] 
+  
+  # Create resample settings
+  for (k in 1:K){
+    val_idx = split_idx[[k]]
+    train_idx = seq(1, N)[-val_idx]
+    resample_split[[k]] = make_splits(list(analysis=train_idx, assessment=val_idx), data=full_train)
+  }
+  resample_settings = new_rset(splits = resample_split,
+                                ids = fold_id,
+                                subclass = c("vfold_cv", "rset"),
+                                attrib = cv_settings)
+  
+  res = workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(tidymodel) %>%
+    fit_resamples(resamples = resample_settings, metrics = loss_functions)
+  
+  output = data.frame()
+  for (i in 1:K){
+    output = rbind(output, res$.metrics[[i]])
+  }
+  N_loss =  output %>% distinct(.metric)%>%pull()%>%length()
+  output = output %>% select(-c(.config, .estimator)) %>%
+    mutate(fold = rep(1:K, each=N_loss)) %>%
+    pivot_wider(names_from = .metric, values_from = .estimate)
+  output
+}
+
+model = lr_model = logistic_reg() %>% set_engine('glm')
+res = CVmaster(model, train_features = kmeans_split$train, training_labels = kmeans_split$train$Label, K = 5,
+         split_func = Kmeans_block_split, loss_functions = metric_set(accuracy, kap))
+
+res
 ```
 
 
