@@ -469,7 +469,6 @@ Such a trivial classifier will have high average accuracy if the image itself is
 ## First order Importance
 ###Logistic Regression
 ```{r}
-
 first_order_importance = function(full_img, kmeans_split, bk_split){
   variable_names = full_img %>% select(-c(X, Y, Label, image)) %>% colnames()
   lr_model = logistic_reg() %>% set_engine('glm')
@@ -486,7 +485,11 @@ first_order_importance = function(full_img, kmeans_split, bk_split){
     
   coeffs = matrix(NA, nrow=length(variable_names), ncol = 3)
   rownames(coeffs) = variable_names
-  colnames(coeffs) = c('Beta: K-means split', 'Beta: Block split', 'Beta: Avg')
+  colnames(coeffs) = c('K-means split', 'Block split', 'Avg')
+  
+  stderrs = matrix(NA, nrow=length(variable_names), ncol = 3)
+  rownames(stderrs) = variable_names
+  colnames(stderrs) = c('K-means split', 'Block split', 'Avg')
   
   for (var in variable_names){
     # K-means
@@ -498,6 +501,7 @@ first_order_importance = function(full_img, kmeans_split, bk_split){
       select(Label, starts_with('.pred')) 
     res[var,1] = lr_perf %>% roc_auc(Label, .pred_Cloudfree) %>% pull(.estimate)
     coeffs[var,1] = broom::tidy(lr_fit) %>% pull(estimate)%>%.[2]
+    stderrs[var,1] = broom::tidy(lr_fit) %>% pull(std.error)%>%.[2]
     
     # BLock
     lr_recipe = recipe(as.formula(paste0('Label ~ ', var)), data = Blocktrain_data) %>%
@@ -507,11 +511,14 @@ first_order_importance = function(full_img, kmeans_split, bk_split){
       select(Label, starts_with('.pred')) 
     res[var,2] = lr_perf %>% roc_auc(Label, .pred_Cloudfree) %>% pull(.estimate)
     coeffs[var,2] = broom::tidy(lr_fit) %>% pull(estimate)%>%.[2]
-    
+    stderrs[var,2] = broom::tidy(lr_fit) %>% pull(std.error)%>%.[2]
+
     res[var,3] = res[var,1]/2 + res[var,2]/2
     coeffs[var,3] = coeffs[var,1]/2 + coeffs[var,2]/2
+    stderrs[var,3] = stderrs[var,1]/2 + stderrs[var,2]/2
+
 }
-return(list(res=res, coeffs = coeffs))
+return(list(res=res, coeffs = coeffs, stderrs=stderrs))
 }
 
 foi = first_order_importance(full_img, kmeans_split, bk_split)
@@ -532,6 +539,37 @@ foi$coeffs %>% round(.,2) %>% as.data.frame() %>% arrange(desc('Beta: Avg')) %>%
   table.attr = "style='width:50%;'") %>%
   kable_classic(full_width = T, html_font = "Cambria",) 
 ```
+```{r}
+se_df = foi$stderrs%>% as.data.frame() %>% mutate(Variable=rownames(.)) %>% pivot_longer(1:2, names_to = 'split', values_to = 'se') %>%
+  select(-contains('Avg'))
+
+foi$coeffs %>% as.data.frame() %>% mutate(Variable=rownames(.)) %>% pivot_longer(1:2, names_to = 'split', values_to = 'coef') %>%
+  select(-contains('Avg'))%>%
+  left_join(se_df, by=c('Variable', 'split')) %>%
+  mutate(lb=coef - 1.96 * se,
+         ub = coef + 1.96 * se,
+          Variable = factor(Variable, levels=(foi$coeffs %>%as.data.frame()%>%arrange(desc(Avg))%>%rownames())))%>%
+  ggplot(aes(Variable, coef, color=split)) +
+  geom_point(aes(shape=split),size=1, position=position_dodge(width=0.7)) +
+  scale_color_manual(name="split",values=c("coral","steelblue")) +
+  scale_shape_manual(name="split",values=c(17,19)) +
+  theme_bw() +
+  geom_errorbar(aes(ymin=lb,ymax=ub),width=0.7,position=position_dodge(width=0.7))+
+  labs(title="95% CI of Logistic Regression Coefficient",
+       y='Beta')+
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_color_discrete(name = "Split Method")+
+  scale_shape_discrete(name="Split Method")
+```
+
+
+
+
+## CVmaster
+```{r}
+CVmaster = function()
+```
+
 
 AUC is highly variable on randomization seed, which changes the Train-Validation split. However, NDAI still outperforms under most of the cases.
 
