@@ -17,6 +17,7 @@ require(GGally)
 require(corrplot)
 require(RColorBrewer)
 require(tidymodels)
+require(discrim)
 
 set.seed(666)
 ```
@@ -572,7 +573,7 @@ CVmaster = function(tidymodel, train_features, training_labels, K, loss_function
   
   # Columns to exclude: X, Y, Label, image. These are not features
   excld_cols = train_features %>% colnames() %>% intersect(c('X', 'Y', 'image', 'Label'))
-  feature_names = train_features %>% select(-excld_cols) %>% colnames()
+  feature_names = train_features %>% dplyr::select(-excld_cols) %>% colnames()
   
   # formula
   formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
@@ -611,22 +612,27 @@ CVmaster = function(tidymodel, train_features, training_labels, K, loss_function
     add_model(tidymodel) %>%
     fit_resamples(resamples = resample_settings, metrics = loss_functions)
   
-  output = data.frame()
+  fold_loss = data.frame()
   for (i in 1:K){
-    output = rbind(output, res$.metrics[[i]])
+    fold_loss = rbind(fold_loss, res$.metrics[[i]])
   }
-  N_loss =  output %>% distinct(.metric)%>%pull()%>%length()
-  output = output %>% select(-c(.config, .estimator)) %>%
+  N_loss =  fold_loss %>% distinct(.metric)%>%pull()%>%length()
+  #fold_loss = fold_loss %>% select(-c(.config, .estimator)) %>%
+  fold_loss = fold_loss %>% dplyr::select(-c(.config, .estimator)) %>%
     mutate(fold = rep(1:K, each=N_loss)) %>%
     pivot_wider(names_from = .metric, values_from = .estimate)
-  output
+  
+  output = list(fold_loss = fold_loss, avg = (fold_loss %>%  dplyr::select(-fold) %>% colMeans()))
 }
 
-model = lr_model = logistic_reg() %>% set_engine('glm')
-res = CVmaster(model, train_features = kmeans_split$train, training_labels = kmeans_split$train$Label, K = 5,
-         split_func = Kmeans_block_split, loss_functions = metric_set(accuracy, kap))
+lr_model = logistic_reg() %>% set_engine('glm')
+lda_model = discrim_linear() %>% set_engine('MASS')
+lr_res = CVmaster(lr_model, train_features = kmeans_split$train, training_labels = kmeans_split$train$Label, K = 9,
+         split_func = block_split, loss_functions = metric_set(accuracy, kap))
+lda_res = CVmaster(lda_model, train_features = kmeans_split$train, training_labels = kmeans_split$train$Label, K = 9,
+         split_func = block_split, loss_functions = metric_set(accuracy, kap))
 
-res
+lda_res
 ```
 
 
