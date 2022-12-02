@@ -647,8 +647,17 @@ CVmaster = function(tidymodel, train_features, training_labels, K, metrics, spli
 lr_model = logistic_reg() %>% set_engine('glm')
 lda_model = discrim_linear() %>% set_engine('MASS')
 qda_model = discrim_quad() %>% set_engine('MASS')
-rf_model = rand_forest(mode='classification', mtry=tune(), trees=50, min_n = tune()) %>% 
+rf_model = rand_forest(mode='classification', mtry=tune(), trees=100, min_n = tune()) %>% 
   set_engine("ranger", num.threads=12)
+
+knns_model = nearest_neighbor(mode='classification',neighbors = tune(), weight_func = tune(), dist_power = tune())
+
+NB_model = naive_Bayes(smoothness = tune(), Laplace = tune())
+
+xgboost_model = boost_tree(tree_depth = tune(), trees = tune(), learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost') %>%set_mode('classification')
+
+
+
 
 ## ---------------------------- K-means split -------------------------------------
 data = rbind(kmeans_split$train, kmeans_split$val)
@@ -672,12 +681,20 @@ qda_res = CVmaster(qda_model,
                   K = 9,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, kap))
+
 rf_res = CVmaster(rf_model,
                   train_features = data,
                   training_labels = data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap), .tune_grid = 20)
+knn_res = CVmaster(NB_model,
+                  train_features = data,
+                  training_labels = data$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, kap), .tune_grid = 10)
+
 
 ## ---------------------------- Block split -------------------------------------
 
