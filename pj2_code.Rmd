@@ -792,8 +792,37 @@ xgboost_res = CVmaster(xgboost_model,
 AUC is highly variable on randomization seed, which changes the Train-Validation split. However, NDAI still outperforms under most of the cases.
 
 ```{r}
+roc_train_data <- train_data %>% select(-c(Y,X, image)) %>% mutate(across(Label, ~ if_else(.x == -1, 0, 1))) %>% mutate(across(Label, factor))
+log_recipe <- recipe(Label ~ . , data = roc_train_data) %>% step_normalize(all_numeric_predictors())
+log_model <- logistic_reg() %>% set_engine('glm')
+log_res <- workflow() %>% add_recipe(log_recipe) %>% add_model(log_model) %>% fit(roc_train_data)
+log_roc <- log_res %>% augment(new_data = roc_train_data) %>% roc_curve(Label, .pred_0)
+log_roc %>% ggplot() + geom_point(aes(1-specificity, sensitivity)) + labs(title = "AUC = 0.9533")
+log_auc <- log_res %>% augment(new_data = roc_train_data) %>% roc_auc(Label, .pred_0)
+log_auc
+
+log_reg_recipe <- recipe(Label ~ . , data = roc_train_data) %>% step_normalize(all_numeric_predictors())
+log_reg_model <- logistic_reg(mixture = 0.829, penalty = 0.0279) %>% set_engine('glmnet')
+log_reg_res <- workflow() %>% add_recipe(log_reg_recipe) %>% add_model(log_reg_model) %>% fit(roc_train_data)
+log_reg_roc <- log_reg_res %>% augment(new_data = roc_train_data) %>% roc_curve(Label, .pred_0)
+log_reg_roc %>% ggplot() + geom_point(aes(1-specificity, sensitivity)) + labs(title = "AUC = 0.9533")
+log_auc <- log_reg_res %>% augment(new_data = roc_train_data) %>% roc_auc(Label, .pred_0)
+log_auc
 
 
+
+lr_reg_model = logistic_reg(mixture =tune(), penalty=tune()) %>% set_engine('glmnet')
+
+lda_model = discrim_linear() %>% set_engine('MASS')
+
+qda_model = discrim_quad() %>% set_engine('MASS')
+
+rf_model = rand_forest(mode='classification', mtry=tune(), trees=300, min_n = tune()) %>% 
+  set_engine("ranger", num.threads=12)
+
+NB_model = naive_Bayes(smoothness = tune(), Laplace = tune())%>%set_mode('classification')
+
+xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost') %>%set_mode('classification')
 ```
 
 
