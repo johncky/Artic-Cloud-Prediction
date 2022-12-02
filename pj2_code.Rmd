@@ -629,10 +629,9 @@ CVmaster = function(tidymodel, train_features, training_labels, K, metrics, spli
   for (i in 1:K){
     fold_loss = rbind(fold_loss, res$.metrics[[i]])
   }
-  
   # If there is tuning parameters, select the best one. If there are multiple metrics, the first one is used to select.
   if (!is.null(.tune_grid)){
-    fold_loss = fold_loss %>% filter(.config %in% (res%>%select_best()%>%pull(.config)))
+    fold_loss = fold_loss %>% dplyr::filter(.config %in% (res%>%select_best()%>%pull(.config)))
   }
   
   N_loss =  fold_loss %>% distinct(.metric)%>%pull()%>%length()
@@ -640,20 +639,29 @@ CVmaster = function(tidymodel, train_features, training_labels, K, metrics, spli
     mutate(fold = rep(1:K, each=N_loss)) %>%
     pivot_wider(names_from = .metric, values_from = .estimate)
   
-  output = list(fold_loss = fold_loss, avg = (fold_loss %>%  dplyr::select(-fold) %>% colMeans()))
+  output = list(fold_loss = fold_loss, 
+                avg = (fold_loss %>%  dplyr::select(-fold) %>% colMeans()),
+                workflow=res)
 }
 
+```
+
+```{r}
 ## ---------------------------- Set up Models -------------------------------------
 lr_model = logistic_reg() %>% set_engine('glm')
+
+lr_reg_model = logistic_reg(mixture =tune(), penalty=tune()) %>% set_engine('glmnet')
+
 lda_model = discrim_linear() %>% set_engine('MASS')
+
 qda_model = discrim_quad() %>% set_engine('MASS')
-rf_model = rand_forest(mode='classification', mtry=tune(), trees=100, min_n = tune()) %>% 
+
+rf_model = rand_forest(mode='classification', mtry=tune(), trees=300, min_n = tune()) %>% 
   set_engine("ranger", num.threads=12)
 
 NB_model = naive_Bayes(smoothness = tune(), Laplace = tune())%>%set_mode('classification')
 
-xgboost_model = boost_tree(tree_depth = tune(), trees = tune(), learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost') %>%set_mode('classification')
-
+xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost') %>%set_mode('classification')
 
 
 
@@ -661,53 +669,132 @@ xgboost_model = boost_tree(tree_depth = tune(), trees = tune(), learn_rate = tun
 train_data = rbind(kmeans_split$train, kmeans_split$val)
 lr_res = CVmaster(lr_model,
                   train_features = train_data,
-                  training_labels = data$Label,
+                  training_labels = train_data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, kap))
+write_rds(lr_res, file='data/Kmeans_lr_res.rds')
+
+lr_reg_res = CVmaster(lr_reg_model,
+                  train_features = train_data,
+                  training_labels = train_data$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap),
+                  .tune_grid = 40)
+write_rds(lr_reg_res, file='data/Kmeans_lr_reg_res.rds')
 
 lda_res = CVmaster(lda_model,
                   train_features = train_data,
-                  training_labels = data$Label,
+                  training_labels = train_data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, kap))
+write_rds(lda_res, file='data/Kmeans_lda_res.rds')
 
 qda_res = CVmaster(qda_model,
                   train_features = train_data,
-                  training_labels = data$Label,
+                  training_labels = train_data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, kap))
+write_rds(qda_res, file='data/Kmeans_qda_res.rds')
 
 rf_res = CVmaster(rf_model,
                   train_features = train_data,
-                  training_labels = data$Label,
+                  training_labels = train_data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 20)
+                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+write_rds(rf_res, file='data/Kmeans_rf_res.rds')
 
 nb_res = CVmaster(NB_model,
                   train_features = train_data,
-                  training_labels = data$Label,
+                  training_labels = train_data$Label,
                   K = 9,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 10)
+                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+ write_rds(nb_res, file='data/Kmeans_nb_res.rds')
 
+xgboost_res = CVmaster(xgboost_model,
+                   train_features = train_data,
+                   training_labels = train_data$Label,
+                   K = 9,
+                   split_func = Kmeans_block_split,
+                   metrics = metric_set(accuracy, kap), .tune_grid = 30)
+ write_rds(xgboost_res, file='data/Kmeans_xgboost_res.rds')
 
 ## ---------------------------- Block split -------------------------------------
 
+train_data2 = rbind(bk_split$train, bk_split$val)
+ 
+lr_res = CVmaster(lr_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap))
+write_rds(lr_res, file='data/Block_lr_res.rds')
 
-lda_res$avg
-lr_res$avg
-qda_res$avg
-rf_res$avg
+lr_reg_res = CVmaster(lr_reg_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap),
+                  .tune_grid = 40)
+write_rds(lr_reg_res, file='data/Block_lr_reg_res.rds')
+
+lda_res = CVmaster(lda_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap))
+write_rds(lda_res, file='data/Block_lda_res.rds')
+
+qda_res = CVmaster(qda_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap))
+write_rds(qda_res, file='data/Block_qda_res.rds')
+
+rf_res = CVmaster(rf_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+write_rds(rf_res, file='data/Block_rf_res.rds')
+
+nb_res = CVmaster(NB_model,
+                  train_features = train_data2,
+                  training_labels = train_data2$Label,
+                  K = 9,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+ write_rds(nb_res, file='data/Block_nb_res.rds')
+
+xgboost_res = CVmaster(xgboost_model,
+                   train_features = train_data2,
+                   training_labels = train_data2$Label,
+                   K = 9,
+                   split_func = Kmeans_block_split,
+                   metrics = metric_set(accuracy, kap), .tune_grid = 30)
+ write_rds(xgboost_res, file='data/Block_xgboost_res.rds')
+
+
 
 ```
 
-
 AUC is highly variable on randomization seed, which changes the Train-Validation split. However, NDAI still outperforms under most of the cases.
 
+```{r}
+
+
+```
 
 
 
