@@ -631,7 +631,7 @@ CVmaster = function(tidymodel, train_features, training_labels, K, metrics, spli
   }
   # If there is tuning parameters, select the best one. If there are multiple metrics, the first one is used to select.
   if (!is.null(.tune_grid)){
-    fold_loss = fold_loss %>% dplyr::filter(.config %in% (res%>%select_best()%>%pull(.config)))
+    fold_loss = fold_loss %>% dplyr::filter(.config %in% (res%>%select_best(metric = "roc_auc")%>%pull(.config)))
   }
   
   N_loss =  fold_loss %>% distinct(.metric)%>%pull()%>%length()
@@ -650,8 +650,6 @@ CVmaster = function(tidymodel, train_features, training_labels, K, metrics, spli
 ## ---------------------------- Set up Models -------------------------------------
 lr_model = logistic_reg() %>% set_engine('glm')
 
-lr_reg_model = logistic_reg(mixture =tune(), penalty=tune()) %>% set_engine('glmnet')
-
 lda_model = discrim_linear() %>% set_engine('MASS')
 
 qda_model = discrim_quad() %>% set_engine('MASS')
@@ -661,7 +659,7 @@ rf_model = rand_forest(mode='classification', mtry=tune(), trees=300, min_n = tu
 
 NB_model = naive_Bayes(smoothness = tune(), Laplace = tune())%>%set_mode('classification')
 
-xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost') %>%set_mode('classification')
+xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost', num.threads=12) %>%set_mode('classification')
 
 
 
@@ -670,58 +668,50 @@ train_data = rbind(kmeans_split$train, kmeans_split$val)
 lr_res = CVmaster(lr_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(lr_res, file='data/Kmeans_lr_res.rds')
 
-lr_reg_res = CVmaster(lr_reg_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
-                  K = 9,
-                  split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap),
-                  .tune_grid = 40)
-write_rds(lr_reg_res, file='data/Kmeans_lr_reg_res.rds')
 
 lda_res = CVmaster(lda_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(lda_res, file='data/Kmeans_lda_res.rds')
 
 qda_res = CVmaster(qda_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(qda_res, file='data/Kmeans_qda_res.rds')
 
 rf_res = CVmaster(rf_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
 write_rds(rf_res, file='data/Kmeans_rf_res.rds')
 
 nb_res = CVmaster(NB_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
  write_rds(nb_res, file='data/Kmeans_nb_res.rds')
 
 xgboost_res = CVmaster(xgboost_model,
                    train_features = train_data,
                    training_labels = train_data$Label,
-                   K = 9,
+                   K = 5,
                    split_func = Kmeans_block_split,
-                   metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
  write_rds(xgboost_res, file='data/Kmeans_xgboost_res.rds')
 
 ## ---------------------------- Block split -------------------------------------
@@ -731,58 +721,49 @@ train_data2 = rbind(bk_split$train, bk_split$val)
 lr_res = CVmaster(lr_model,
                   train_features = train_data2,
                   training_labels = train_data2$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(lr_res, file='data/Block_lr_res.rds')
-
-lr_reg_res = CVmaster(lr_reg_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
-                  K = 9,
-                  split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap),
-                  .tune_grid = 40)
-write_rds(lr_reg_res, file='data/Block_lr_reg_res.rds')
 
 lda_res = CVmaster(lda_model,
                   train_features = train_data2,
                   training_labels = train_data2$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(lda_res, file='data/Block_lda_res.rds')
 
 qda_res = CVmaster(qda_model,
                   train_features = train_data2,
                   training_labels = train_data2$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap))
+                  metrics = metric_set(accuracy, roc_auc))
 write_rds(qda_res, file='data/Block_qda_res.rds')
 
 rf_res = CVmaster(rf_model,
                   train_features = train_data2,
                   training_labels = train_data2$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
 write_rds(rf_res, file='data/Block_rf_res.rds')
 
 nb_res = CVmaster(NB_model,
                   train_features = train_data2,
                   training_labels = train_data2$Label,
-                  K = 9,
+                  K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
  write_rds(nb_res, file='data/Block_nb_res.rds')
 
 xgboost_res = CVmaster(xgboost_model,
                    train_features = train_data2,
                    training_labels = train_data2$Label,
-                   K = 9,
+                   K = 5,
                    split_func = Kmeans_block_split,
-                   metrics = metric_set(accuracy, kap), .tune_grid = 30)
+                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
  write_rds(xgboost_res, file='data/Block_xgboost_res.rds')
 
 
@@ -796,7 +777,9 @@ roc_train_data <- train_data %>% select(-c(Y,X, image)) %>% mutate(across(Label,
 log_recipe <- recipe(Label ~ . , data = roc_train_data) %>% step_normalize(all_numeric_predictors())
 log_model <- logistic_reg() %>% set_engine('glm')
 log_res <- workflow() %>% add_recipe(log_recipe) %>% add_model(log_model) %>% fit(roc_train_data)
-log_roc <- log_res %>% augment(new_data = roc_train_data) %>% roc_curve(Label, .pred_0)
+log_roc <- log_res %>% augment(new_data = roc_train_data) %>% roc_curve(Label, .pred_1)
+
+log_res %>% augment(new_data = roc_train_data)
 log_roc %>% ggplot() + geom_point(aes(1-specificity, sensitivity)) + labs(title = "AUC = 0.9533")
 log_auc <- log_res %>% augment(new_data = roc_train_data) %>% roc_auc(Label, .pred_0)
 log_auc
@@ -829,8 +812,90 @@ xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune()
 
 
 
+# Test Error
+```{r}
+a %>% show_best()
+```
+
+```{r}
+# --------- Models using best params from CV result above ---------
+lr_model = logistic_reg() %>% set_engine('glm')
+lr_reg_model = logistic_reg(mixture =tune(), penalty=tune()) %>% set_engine('glmnet')
+lda_model = discrim_linear() %>% set_engine('MASS')
+qda_model = discrim_quad() %>% set_engine('MASS')
+
+rf_model = rand_forest(mode='classification', mtry=4, trees=300, min_n = 20) %>% set_engine("ranger", num.threads=12)
+
+NB_model = naive_Bayes(smoothness = 1.48, Laplace = 1.08)%>%set_mode('classification')
+
+xgboost_model = boost_tree(tree_depth = 9	, trees = 300, learn_rate = 0.0408, min_n = 8, loss_reduction =0.0191,
+                           sample_size = 0.944, stop_iter = 17)%>%set_engine('xgboost') %>%set_mode('classification')
+
+# --------- K means Split ----------
+feature_names = train_data %>% dplyr::select(-c(X,Y,Label, image, block)) %>% colnames()
+formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
+
+kmean_lr_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>%
+  add_model(lr_model)%>%
+  fit(data = train_data) %>%
+  augment(new_data = kmeans_split$test)
+kmean_lr_roc_test =  kmean_lr_roc_perf %>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="Logistic - test")
 
 
+kmean_lda_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>% add_model(lda_model)%>%
+  fit(data = train_data) %>% augment(new_data = kmeans_split$test)
+kmean_lda_roc_test = kmean_lda_roc_perf %>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="LDA - test")
+
+
+kmean_qda_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>% add_model(qda_model)%>%
+  fit(data = train_data) %>% augment(new_data = kmeans_split$test)
+kmean_qda_roc_test = kmean_qda_roc_perf %>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="QDA - test")
+
+
+kmean_rf_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>% add_model(rf_model)%>%
+  fit(data = train_data) %>% augment(new_data = kmeans_split$test)
+kmean_rf_roc_test = kmean_rf_roc_perf %>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="Random Forest - test")
+
+
+kmean_nb_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>% add_model(NB_model)%>%
+  fit(data = train_data) %>% augment(new_data = kmeans_split$test)
+kmean_nb_roc_test = kmean_nb_roc_perf %>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="Naive Bayes - test")
+
+
+kmean_xgboost_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>% add_model(xgboost_model)%>%
+  fit(data = train_data) %>% augment(new_data = kmeans_split$test)
+kmean_xgboost_roc_test = kmean_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>%
+  yardstick::roc_curve(factor(Label),.pred_Cloudfree) %>%
+  mutate(name="XGboost - test")
+
+rbind(kmean_lr_roc_test,
+      kmean_lda_roc_test,
+      kmean_qda_roc_test,
+      kmean_rf_roc_test,
+      kmean_nb_roc_test,
+      kmean_xgboost_roc_test)%>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
+  geom_path(lwd = 1.5, alpha = 0.8) +
+  geom_abline(lty = 3) +
+  coord_equal()
+
+```
+
+
+```{r}
+
+
+```
 
 
 

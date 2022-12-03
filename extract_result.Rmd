@@ -9,11 +9,21 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+require(tidyverse)
+require(kableExtra)
+require(patchwork)
+require(GGally)
+require(corrplot)
+require(RColorBrewer)
+require(tidymodels)
+require(discrim)
+require(ranger)
+set.seed(666)
+```
 
 # read all CV results of all models
 ```{r}
-library(dplyr)
-
 extract_fold_loss = function(path='./data'){
   Kmeans_split_fold_loss = c()
   block_split_fold_loss = c()
@@ -28,14 +38,56 @@ extract_fold_loss = function(path='./data'){
     }
   }
   Kmeans_fold_loss = do.call(cbind, Kmeans_split_fold_loss) %>% data.frame() %>% select(fold, contains('Kmeans'))
-  block_fold_loss = do.call(cbind, block_split_fold_loss) %>% data.frame() %>% select(fold, contains('Kmeans'))
+  block_fold_loss = do.call(cbind, block_split_fold_loss) %>% data.frame() %>% select(fold, contains('Block'))
   return(list('Kmeans'=Kmeans_fold_loss,
               'Block' = block_fold_loss))
 }
 
 
 CV_res = extract_fold_loss()
-model_res$Block_lda_res.rds
+kmeans_cv_res = CV_res$Kmeans
+colnames(kmeans_cv_res) = c('Fold', 'LDA', 'Logistic Regression (Reg)', 'Logistic Regression', 'Naive Bayes', 
+                            'QDA','Random Forest', 'XGBoost')
 
-Kmeans_fold_loss
+block_cv_res = CV_res$Block
+colnames(block_cv_res) = c('Fold', 'LDA', 'Logistic Regression (Reg)', 'Logistic Regression', 'Naive Bayes', 
+                            'QDA','Random Forest')
+block_cv_res %>% colMeans()
+
+
+kmeans_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+  relocate(LDA, .before = QDA)%>%
+  relocate('Logistic Regression (Reg)', .after = 'Logistic Regression')%>%
+  kbl(caption = "<center><strong>K-means Split: CV Accuracy<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
+  row_spec(dim(kmeans_cv_res)[1]+1, bold = T) %>%
+  row_spec(dim(kmeans_cv_res)[1], extra_css = "border-bottom: 1px solid") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+```
+
+```{r}
+block_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+  relocate(LDA, .before = QDA)%>%
+  #relocate('Logistic Regression (Reg)', .after = 'Logistic Regression')%>%
+  kbl(caption = "<center><strong>Block Split: CV Accuracy<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
+  row_spec(dim(block_cv_res)[1]+1, bold = T) %>%
+  row_spec(dim(block_cv_res)[1], extra_css = "border-bottom: 1px solid") %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
+```
+
+# Test Error
+```{r}
+
+```
+
+```{r}
+```
+
+```{r}
+
+
 ```
