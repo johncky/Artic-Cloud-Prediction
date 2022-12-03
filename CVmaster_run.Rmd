@@ -191,7 +191,7 @@ xgboost_model = boost_tree(tree_depth = tune(), trees = 1000, learn_rate = tune(
 
 
 ## ---------------------------- K-means split -------------------------------------
-train_data = rbind(kmeans_split$train, kmeans_split$val)
+train_data = rbind(kmeans_split$train, kmeans_split$val) %>% mutate(Label = factor(Label))
 lr_res = CVmaster(lr_model,
                   train_features = train_data,
                   training_labels = train_data$Label,
@@ -230,7 +230,7 @@ nb_res = CVmaster(NB_model,
                   training_labels = train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                  metrics = metric_set(accuracy, roc_auc))
  write_rds(nb_res, file='data/Kmeans_nb_res.rds')
 
 xgboost_res = CVmaster(xgboost_model,
@@ -243,7 +243,7 @@ xgboost_res = CVmaster(xgboost_model,
 
 ## ---------------------------- Block split -------------------------------------
 
-train_data2 = rbind(bk_split$train, bk_split$val)
+train_data2 = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label))
  
 lr_res = CVmaster(lr_model,
                   train_features = train_data2,
