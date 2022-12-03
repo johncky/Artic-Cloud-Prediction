@@ -330,10 +330,10 @@ Performance might be affected by spatial autocorrelation.
 #   data['idx'] = 1:(dim(data)[1])
 #   data = data %>% arrange(X, Y)
 #   data['block']= block_id
-#   
+# 
 #   idx = vector(mode = 'list',length = K)
 #   for (i in 1:K){
-#     idx[[i]] = data %>% filter(block==i) %>% pull(idx) 
+#     idx[[i]] = data %>% filter(block==i) %>% pull(idx)
 #   }
 #   return(idx)
 # }
@@ -372,7 +372,7 @@ Performance might be affected by spatial autocorrelation.
 #   return (idx)
 # }
 # 
-# 
+
 # plot_block(full_img,Kmeans_block_split, 3, 1)
 ```
 ## Split data into Train / Validation / Test

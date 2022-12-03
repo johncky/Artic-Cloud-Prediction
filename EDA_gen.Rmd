@@ -318,6 +318,32 @@ stat %>% round(.,2) %>% data.frame() %>% arrange(desc(Statistics))%>%kbl(
 
 
 ## -------------------------------  Block Split Method ---------------------------------
+block_split = function(data, K){
+  N =data %>% dim() %>% .[1]
+  fold_n = round(N/ K)
+  remainder = N - (K-1) * fold_n
+  block_id = rep(1:(K-1), each= fold_n)
+  block_id = c(block_id, rep(K, remainder))
+  data['idx'] = 1:(dim(data)[1])
+  data = data %>% arrange(X, Y)
+  data['block']= block_id
+
+  idx = vector(mode = 'list',length = K)
+  for (i in 1:K){
+    idx[[i]] = data %>% filter(block==i) %>% pull(idx)
+  }
+  return(idx)
+}
+
+Kmeans_block_split = function(data, K){
+  idx = vector(mode = 'list',length = K)
+  res = kmeans(data %>%  dplyr::select(Y,X) ,K)
+  for (i in 1:K){
+    idx[[i]] = which(res$cluster == i)
+  }
+  return (idx)
+}
+
 plot_block = function(data, split_func, K, img, name){
   res = split_func(data, K)
   
