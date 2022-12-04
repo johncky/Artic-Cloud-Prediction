@@ -17,7 +17,6 @@ require(GGally)
 require(corrplot)
 require(RColorBrewer)
 require(tidymodels)
-require(discrim)
 require(ranger)
 set.seed(666)
 ```
@@ -46,18 +45,17 @@ extract_fold_loss = function(path='./data'){
 
 CV_res = extract_fold_loss()
 kmeans_cv_res = CV_res$Kmeans
-colnames(kmeans_cv_res) = c('Fold', 'LDA', 'Logistic Regression (Reg)', 'Logistic Regression', 'Naive Bayes', 
+colnames(kmeans_cv_res) = c('Fold', 'LDA',  'Logistic Regression', 'Naive Bayes', 
                             'QDA','Random Forest', 'XGBoost')
 
 block_cv_res = CV_res$Block
-colnames(block_cv_res) = c('Fold', 'LDA', 'Logistic Regression (Reg)', 'Logistic Regression', 'Naive Bayes', 
-                            'QDA','Random Forest')
+colnames(block_cv_res) = c('Fold', 'LDA', 'Logistic Regression', 'Naive Bayes', 
+                            'QDA','Random Forest', 'XGBoost')
 block_cv_res %>% colMeans()
 
 
 kmeans_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
   relocate(LDA, .before = QDA)%>%
-  relocate('Logistic Regression (Reg)', .after = 'Logistic Regression')%>%
   kbl(caption = "<center><strong>K-means Split: CV Accuracy<center><strong>",
       escape = FALSE,
       format = 'html',) %>%
