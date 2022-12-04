@@ -99,7 +99,40 @@ set.seed(12344)
 
 kmeans_split = create_split(full_img, Kmeans_block_split, filter_unlabeled=T)
 bk_split = create_split(full_img, block_split, filter_unlabeled=T)
+```
 
+# Extract best Xgboost & Random Forest Parameters
+```{r}
+## ------ K-means Split  ------
+kmeans_best_xgboost = read_rds('./data/Kmeans_xgboost_res.rds')$fold_loss
+kmeans_best_xgboost_param = list(min_n = kmeans_best_xgboost$min_n[1],
+                                 tree_depth = kmeans_best_xgboost$tree_depth[1],
+                                 learn_rate = kmeans_best_xgboost$learn_rate[1],
+                                 loss_reduction = kmeans_best_xgboost$loss_reduction[1],
+                                 sample_size = kmeans_best_xgboost$sample_size[1],
+                                 stop_iter = kmeans_best_xgboost$stop_iter[1])
+
+kmeans_best_rf = read_rds('./data/Kmeans_rf_res.rds')$fold_loss
+kmeans_best_rf_param = list(mtry = kmeans_best_rf$mtry[1],
+                                 min_n = kmeans_best_rf$min_n[1])
+
+
+## ------ Block Split ------
+block_best_xgboost = read_rds('./data/block_xgboost_res.rds')$fold_loss
+block_best_xgboost_param = list(min_n = block_best_xgboost$min_n[1],
+                                 tree_depth = block_best_xgboost$tree_depth[1],
+                                 learn_rate = block_best_xgboost$learn_rate[1],
+                                 loss_reduction = block_best_xgboost$loss_reduction[1],
+                                 sample_size = block_best_xgboost$sample_size[1],
+                                 stop_iter = block_best_xgboost$stop_iter[1])
+
+
+block_best_rf = read_rds('./data/block_rf_res.rds')$fold_loss
+block_best_rf_param = list(mtry = block_best_rf$mtry[1],
+                                 min_n = block_best_rf$min_n[1])
+```
+
+```{r}
 
 # --------- Models using best params from CV result above ---------
 lr_model = logistic_reg() %>% set_engine('glm')
@@ -107,12 +140,17 @@ lr_reg_model = logistic_reg(mixture =tune(), penalty=tune()) %>% set_engine('glm
 lda_model = discrim_linear() %>% set_engine('MASS')
 qda_model = discrim_quad() %>% set_engine('MASS')
 
-rf_model = rand_forest(mode='classification', mtry=4, trees=300, min_n = 20) %>% set_engine("ranger", num.threads=12)
+rf_model = rand_forest(mode='classification', mtry=kmeans_best_rf_param$mtry, trees=300, min_n = kmeans_best_rf_param$min_n) %>%
+  set_engine("ranger", num.threads=12)
 
 NB_model = naive_Bayes(smoothness = 1.48, Laplace = 1.08)%>%set_mode('classification')
 
-xgboost_model = boost_tree(tree_depth = 12	, trees = 300, learn_rate = 0.0628, min_n = 14, loss_reduction= 0.0000317,
-                           sample_size = 0.768, stop_iter = 17)%>%set_engine('xgboost') %>%set_mode('classification')
+xgboost_model = boost_tree(tree_depth = kmeans_best_xgboost_param$tree_depth	, trees = 300,
+                           learn_rate = kmeans_best_xgboost_param$learn_rate,
+                           min_n = kmeans_best_xgboost_param$min_n,
+                           loss_reduction= kmeans_best_xgboost_param$loss_reduction,
+                           sample_size = kmeans_best_xgboost_param$sample_size,
+                           stop_iter = kmeans_best_xgboost_param$stop_iter)%>%set_engine('xgboost') %>%set_mode('classification')
 
 # --------- K means Split ----------
 train_data = rbind(kmeans_split$train, kmeans_split$val) %>% mutate(Label = factor(Label))
@@ -170,7 +208,7 @@ rbind(kmean_lr_roc_test,
       kmean_nb_roc_test,
       kmean_xgboost_roc_test)%>%
   ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
-  geom_path(lwd = 1, alpha = 0.8) +
+  geom_path(lwd = 0.7, alpha = 0.8) +
   geom_abline(lty = 3) +
   coord_equal()
 
@@ -203,6 +241,18 @@ accu %>% left_join(auc)
 ```
 
 ```{r}
+# ------ Model Params ------
+rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=300, min_n = block_best_rf_param$min_n) %>%
+  set_engine("ranger", num.threads=12)
+
+xgboost_model = boost_tree(tree_depth = block_best_xgboost_param$tree_depth	, trees = 300,
+                           learn_rate = block_best_xgboost_param$learn_rate,
+                           min_n = block_best_xgboost_param$min_n,
+                           loss_reduction= block_best_xgboost_param$loss_reduction,
+                           sample_size = block_best_xgboost_param$sample_size,
+                           stop_iter = block_best_xgboost_param$stop_iter)%>%set_engine('xgboost') %>%set_mode('classification')
+
+
 # --------- K means Split ----------
 train_data_bk = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label))
 test_data_bk = bk_split$test %>% mutate(Label = factor(Label))

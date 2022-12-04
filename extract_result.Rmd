@@ -78,6 +78,13 @@ block_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numer
 ```
 
 ```{r}
-read_rds('Kmeans_xgboost_res.rds')
+a = read_rds('./data/Kmeans_xgboost_res.rds')
+xgboost = list()
+for (k in 1:5){
+  xgboost = rbind(xgboost, a$workflow$.metrics[[k]])
+}
+xgboost = xgboost %>% filter(.config %in% (a$workflow %>%select_best( "accuracy")%>%pull(.config)))
+xgboost %>% filter(.metric=='accuracy') %>% pull(.estimate) %>% mean()
+
 
 ```
