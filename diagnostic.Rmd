@@ -243,9 +243,12 @@ plot_data%>%
 ## Decision Boundary
 ```{r}
 
-plot_misclass = function(test_data, misclass_points){
+plot_misclass = function(test_data, predictions){
   
   my.cols = c('grey', 'white',"black")
+  FP = predictions %>% filter(Label==-1 & .pred_class == 1)
+  FN = predictions %>% filter(Label==1 & .pred_class == -1)
+  
   for (img in 1:3){
     data = test_data %>% filter(image==img)
     
@@ -258,10 +261,14 @@ plot_misclass = function(test_data, misclass_points){
         geom_raster(aes(x=data$X, y=data$Y, fill=data$color)) +
         scale_fill_manual(values=my.cols)+
         geom_raster(data = allpossible[!data, on = c("X", "Y")], mapping=aes(X, Y), color = "black")+
-        geom_point(mapping=aes(x=misclass_points$X, y=misclass_points$Y), color='red')+
-        scale_fill_manual(values=my.cols)+
+        geom_point(mapping=aes(x=FP$X, y=FP$Y), color='red')+
+        geom_point(mapping=aes(x=FN$X, y=FN$Y), color='blue')+
         theme(plot.title = element_text(hjust = 0.5),  legend.position="none")+
-        labs(title=paste0('Block Split: Test Set (Image ', img,') Misclassified Points'), x='X-coordinate', y='Y-coordinate')
+        labs(title=paste0('Test Set (Image ', img,'): FP (red) & FN (blue)'), x='X-coordinate', y='Y-coordinate')+
+        scale_color_manual(name='Error Type',
+                     breaks=c('False Positive', 'False Negative'),
+                     values=c('False Positive'='red', 'False Negative'='blue'))+
+        scale_fill_manual(values=my.cols)
     
       print(p)
     }
@@ -269,46 +276,58 @@ plot_misclass = function(test_data, misclass_points){
   }
 
 }
-misclass_points = bk_rf_pred %>% mutate(misclass = (Label != .pred_class)) %>% filter(misclass==T)
-plot_misclass(test_data_bk, misclass_points)
+plot_misclass(test_data_bk, bk_rf_pred)
 ```
 
 ```{r}
-p1 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+error_data = bk_rf_pred %>% mutate(Type = ifelse(Label==-1 & .pred_class == 1, 'False Positive', 
+                                         ifelse(Label==1 & .pred_class == -1, 'False Negative', 
+                                                ifelse(Label==1 & .pred_class == 1, 'True Positive', 'True Negative' ))))
+
+
+p1 = error_data%>% 
   ggplot()+
-  geom_density(aes(NDAI, fill=Misclassified), alpha=0.5)
+  geom_density(aes(NDAI, fill=Type), alpha=0.5)
 
-p2 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p2 = error_data %>% 
   ggplot()+
-  geom_density(aes(CORR, fill=Misclassified), alpha=0.5)
+  geom_density(aes(CORR, fill=Type), alpha=0.5)
 
-p3 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p3 = error_data %>% 
   ggplot()+
-  geom_density(aes(SD, fill=Misclassified), alpha=0.5)
+  geom_density(aes(SD, fill=Type), alpha=0.5)
 
-p4 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p4 = error_data%>% 
   ggplot()+
-  geom_density(aes(Rad_Df, fill=Misclassified), alpha=0.5)
+  geom_density(aes(Rad_Df, fill=Type), alpha=0.5)
 
-p5 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p5 = error_data%>% 
   ggplot()+
-  geom_density(aes(Rad_Cf, fill=Misclassified), alpha=0.5)
+  geom_density(aes(Rad_Cf, fill=Type), alpha=0.5)
 
-p6 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p6 = error_data %>% 
   ggplot()+
-  geom_density(aes(Rad_Bf, fill=Misclassified), alpha=0.5)
+  geom_density(aes(Rad_Bf, fill=Type), alpha=0.5)
 
-p7 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p7 = error_data %>% 
   ggplot()+
-  geom_density(aes(Rad_Af, fill=Misclassified), alpha=0.5)
+  geom_density(aes(Rad_Af, fill=Type), alpha=0.5)
 
-p8 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+p8 =error_data%>% 
   ggplot()+
-  geom_density(aes(Rad_An, fill=Misclassified), alpha=0.5)
+  geom_density(aes(Rad_An, fill=Type), alpha=0.5)
 
 
-p1+p2+p3+p4+p5+p6+p7+p8 + plot_layout(nrow=3,  guides = "collect")
+p1 + p2 + plot_layout(ncol=2, guides = "collect")
 ```
+
+```{r}
+error_data %>% pivot_longer(cols = c('.pred_-1', '.pred_1')) %>% ggplot()+
+  geom_boxplot(aes(x = Type, y=value, fill=name)) + 
+  labs(title='Test Set Predicted Probabilities By Error Type')+theme(plot.title = element_text(hjust = 0.5))
+```
+
+
 
 
 
