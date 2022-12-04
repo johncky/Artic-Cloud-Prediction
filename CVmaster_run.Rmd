@@ -95,9 +95,10 @@ create_split = function(data, split_func, filter_unlabeled=T){
 }
 
 set.seed(12344)
-
 kmeans_split = create_split(full_img, Kmeans_block_split, filter_unlabeled=T)
 bk_split = create_split(full_img, block_split, filter_unlabeled=T)
+
+
 
 CVmaster = function(tidymodel, train_features, training_labels, K, metrics, split_func,
                     .scale=T, .tune_grid=NULL, excld_cols = c('X', 'Y', 'image', 'Label')){
@@ -181,20 +182,21 @@ lda_model = discrim_linear() %>% set_engine('MASS')
 
 qda_model = discrim_quad() %>% set_engine('MASS')
 
-rf_model = rand_forest(mode='classification', mtry=tune(), trees=1000, min_n = tune()) %>% 
+rf_model = rand_forest(mode='classification', mtry=tune(), trees=300, min_n = tune()) %>% 
   set_engine("ranger", num.threads=24)
 
 NB_model = naive_Bayes(smoothness = 1.48, Laplace = 1.08)%>%set_mode('classification')
+#NB_model = naive_Bayes(smoothness = tune(), Laplace = tune())%>%set_mode('classification')
 
-xgboost_model = boost_tree(tree_depth = tune(), trees = 1000, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost', num.threads=24) %>%set_mode('classification')
+xgboost_model = boost_tree(tree_depth = tune(), trees = 300, learn_rate = tune(), min_n = tune(), loss_reduction = tune(), sample_size = tune(), stop_iter = tune())%>%set_engine('xgboost', num.threads=24) %>%set_mode('classification')
 
 
 
 ## ---------------------------- K-means split -------------------------------------
-train_data = rbind(kmeans_split$train, kmeans_split$val) %>% mutate(Label = factor(Label))
+kmean_train_data = rbind(kmeans_split$train, kmeans_split$val) %>% mutate(Label = factor(Label))
 lr_res = CVmaster(lr_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
+                  train_features = kmean_train_data,
+                  training_labels = kmean_train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, roc_auc))
@@ -202,95 +204,95 @@ write_rds(lr_res, file='data/Kmeans_lr_res.rds')
 
 
 lda_res = CVmaster(lda_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
+                  train_features = kmean_train_data,
+                  training_labels = kmean_train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, roc_auc))
 write_rds(lda_res, file='data/Kmeans_lda_res.rds')
 
 qda_res = CVmaster(qda_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
+                  train_features = kmean_train_data,
+                  training_labels = kmean_train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, roc_auc))
 write_rds(qda_res, file='data/Kmeans_qda_res.rds')
 
 rf_res = CVmaster(rf_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
+                  train_features = kmean_train_data,
+                  training_labels = kmean_train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 30)
 write_rds(rf_res, file='data/Kmeans_rf_res.rds')
 
 nb_res = CVmaster(NB_model,
-                  train_features = train_data,
-                  training_labels = train_data$Label,
+                  train_features = kmean_train_data,
+                  training_labels = kmean_train_data$Label,
                   K = 5,
                   split_func = Kmeans_block_split,
                   metrics = metric_set(accuracy, roc_auc))
  write_rds(nb_res, file='data/Kmeans_nb_res.rds')
 
 xgboost_res = CVmaster(xgboost_model,
-                   train_features = train_data,
-                   training_labels = train_data$Label,
+                   train_features = kmean_train_data,
+                   training_labels = kmean_train_data$Label,
                    K = 5,
                    split_func = Kmeans_block_split,
-                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 30)
  write_rds(xgboost_res, file='data/Kmeans_xgboost_res.rds')
 
 ## ---------------------------- Block split -------------------------------------
 
-train_data2 = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label))
+bk_train_data = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label))
  
 lr_res = CVmaster(lr_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
+                  train_features = bk_train_data,
+                  training_labels = bk_train_data$Label,
                   K = 5,
-                  split_func = Kmeans_block_split,
+                  split_func = block_split,
                   metrics = metric_set(accuracy, roc_auc))
 write_rds(lr_res, file='data/Block_lr_res.rds')
 
 lda_res = CVmaster(lda_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
+                  train_features = bk_train_data,
+                  training_labels = bk_train_data$Label,
                   K = 5,
-                  split_func = Kmeans_block_split,
+                  split_func = block_split,
                   metrics = metric_set(accuracy, roc_auc))
 write_rds(lda_res, file='data/Block_lda_res.rds')
 
 qda_res = CVmaster(qda_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
+                  train_features = bk_train_data,
+                  training_labels = bk_train_data$Label,
                   K = 5,
-                  split_func = Kmeans_block_split,
+                  split_func = block_split,
                   metrics = metric_set(accuracy, roc_auc))
 write_rds(qda_res, file='data/Block_qda_res.rds')
 
 rf_res = CVmaster(rf_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
+                  train_features = bk_train_data,
+                  training_labels = bk_train_data$Label,
                   K = 5,
-                  split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                  split_func = block_split,
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 30)
 write_rds(rf_res, file='data/Block_rf_res.rds')
 
 nb_res = CVmaster(NB_model,
-                  train_features = train_data2,
-                  training_labels = train_data2$Label,
+                  train_features = bk_train_data,
+                  training_labels = bk_train_data$Label,
                   K = 5,
-                  split_func = Kmeans_block_split,
-                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                  split_func = block_split,
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = 30)
  write_rds(nb_res, file='data/Block_nb_res.rds')
 
 xgboost_res = CVmaster(xgboost_model,
-                   train_features = train_data2,
-                   training_labels = train_data2$Label,
+                   train_features = bk_train_data,
+                   training_labels = bk_train_data$Label,
                    K = 5,
-                   split_func = Kmeans_block_split,
-                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 10)
+                   split_func = block_split,
+                   metrics = metric_set(accuracy, roc_auc), .tune_grid = 30)
  write_rds(xgboost_res, file='data/Block_xgboost_res.rds')
 
 
