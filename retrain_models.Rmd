@@ -111,8 +111,8 @@ rf_model = rand_forest(mode='classification', mtry=4, trees=300, min_n = 20) %>%
 
 NB_model = naive_Bayes(smoothness = 1.48, Laplace = 1.08)%>%set_mode('classification')
 
-xgboost_model = boost_tree(tree_depth = 9	, trees = 300, learn_rate = 0.0408, min_n = 8, loss_reduction =0.0191,
-                           sample_size = 0.944, stop_iter = 17)%>%set_engine('xgboost') %>%set_mode('classification')
+xgboost_model = boost_tree(tree_depth = 12	, trees = 300, learn_rate = 0.0628, min_n = 14, loss_reduction= 0.0000317,
+                           sample_size = 0.768, stop_iter = 17)%>%set_engine('xgboost') %>%set_mode('classification')
 
 # --------- K means Split ----------
 train_data = rbind(kmeans_split$train, kmeans_split$val) %>% mutate(Label = factor(Label))
@@ -173,6 +173,7 @@ rbind(kmean_lr_roc_test,
   geom_path(lwd = 1, alpha = 0.8) +
   geom_abline(lty = 3) +
   coord_equal()
+
 
 ```
 

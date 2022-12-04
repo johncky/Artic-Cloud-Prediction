@@ -77,3 +77,7 @@ block_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numer
 
 ```
 
+```{r}
+read_rds('Kmeans_xgboost_res.rds')
+
+```
