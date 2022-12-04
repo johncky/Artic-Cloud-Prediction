@@ -201,16 +201,20 @@ kmean_xgboost_roc_test = kmean_xgboost_roc_perf%>%select(Label, starts_with(".pr
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
   mutate(name="XGboost - test")
 
-rbind(kmean_lr_roc_test,
+p = rbind(kmean_lr_roc_test,
       kmean_lda_roc_test,
       kmean_qda_roc_test,
       kmean_rf_roc_test,
       kmean_nb_roc_test,
       kmean_xgboost_roc_test)%>%
   ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
-  geom_path(lwd = 0.7, alpha = 0.8) +
+  geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
-  coord_equal()
+  coord_equal() + labs(
+    title='K-means Split: Test ROC'
+  )
+ggsave('./pic/kmeans_test_roc.jpg', p)
+
 
 
 ```
@@ -236,7 +240,10 @@ auc = rbind(
   arrange(desc(.estimate))%>%mutate('Test AUC' = .estimate, 'Model' = model)%>%
   select('Model', 'Test AUC') 
 
-accu %>% left_join(auc)
+accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>K-means Split: Test Performance<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
+  kable_classic(full_width = F, html_font = "Cambria") %>% save_kable('./pic/kmeans_test_table.pdf')
 
 ```
 
@@ -302,17 +309,17 @@ bk_xgboost_roc_test = bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) 
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
   mutate(name="XGboost - test")
 
-rbind(bk_lr_roc_test,
+p = rbind(bk_lr_roc_test,
       bk_lda_roc_test,
       bk_qda_roc_test,
       bk_rf_roc_test,
       bk_nb_roc_test,
       bk_xgboost_roc_test)%>%
   ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
-  geom_path(lwd = 1, alpha = 0.8) +
+  geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
   coord_equal()
-
+ggsave('./pic/block_test_roc.jpg', p)
 ```
 
 ```{r}
@@ -336,5 +343,9 @@ auc = rbind(
   arrange(desc(.estimate))%>%mutate('Test AUC' = .estimate, 'Model' = model)%>%
   select('Model', 'Test AUC') 
 
-accu %>% left_join(auc)
+accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>Block Split: Test Performance<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
+  kable_classic(full_width = F, html_font = "Cambria") %>% save_kable('./pic/block_test_table.pdf')
+
 ```
