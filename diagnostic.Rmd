@@ -225,24 +225,91 @@ for (k in 1:5){
   auc = round(cv_fold_roc_res[[k]] %>% roc_auc(factor(Label),'.pred_-1') %>% pull(.estimate),3)
   d = cv_fold_roc_res[[k]] %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name=paste0("Fold",k, ', AUC: ', auc))
+  mutate(Fold=paste0("Fold",k, ', AUC: ', auc))
          
   plot_data = rbind(plot_data, d)
 }
 
 plot_data%>%
-  ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
+  ggplot(aes(x = 1 - specificity, y = sensitivity, color=Fold))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
   coord_equal() + labs(
-    title='Block Split: CV Fold-Wise ROC'
+    title='Block Split: Cross Validation ROC'
   )
+
+```
+
+## Decision Boundary
+```{r}
+
+plot_misclass = function(test_data, misclass_points){
+  
+  my.cols = c('grey', 'white',"black")
+  for (img in 1:3){
+    data = test_data %>% filter(image==img)
+    
+    if (dim(data)[1] > 0){
+      require(data.table)
+      allpossible <- do.call(CJ, lapply(data[, c("X", "Y")], unique))
+      data = data  %>% 
+        mutate(color = ifelse(Label==0, 'Unlabelled', ifelse(Label==1, 'Cloudy', 'Cloud-free')))
+      p = ggplot() +
+        geom_raster(aes(x=data$X, y=data$Y, fill=data$color)) +
+        scale_fill_manual(values=my.cols)+
+        geom_raster(data = allpossible[!data, on = c("X", "Y")], mapping=aes(X, Y), color = "black")+
+        geom_point(mapping=aes(x=misclass_points$X, y=misclass_points$Y), color='red')+
+        scale_fill_manual(values=my.cols)+
+        theme(plot.title = element_text(hjust = 0.5),  legend.position="none")+
+        labs(title=paste0('Block Split: Test Set (Image ', img,') Misclassified Points'), x='X-coordinate', y='Y-coordinate')
+    
+      print(p)
+    }
+
+  }
+
+}
+misclass_points = bk_rf_pred %>% mutate(misclass = (Label != .pred_class)) %>% filter(misclass==T)
+plot_misclass(test_data_bk, misclass_points)
 ```
 
 ```{r}
+p1 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(NDAI, fill=Misclassified), alpha=0.5)
+
+p2 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(CORR, fill=Misclassified), alpha=0.5)
+
+p3 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(SD, fill=Misclassified), alpha=0.5)
+
+p4 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(Rad_Df, fill=Misclassified), alpha=0.5)
+
+p5 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(Rad_Cf, fill=Misclassified), alpha=0.5)
+
+p6 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(Rad_Bf, fill=Misclassified), alpha=0.5)
+
+p7 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(Rad_Af, fill=Misclassified), alpha=0.5)
+
+p8 = bk_rf_pred %>% mutate(Misclassified = (Label != .pred_class)) %>% 
+  ggplot()+
+  geom_density(aes(Rad_An, fill=Misclassified), alpha=0.5)
 
 
+p1+p2+p3+p4+p5+p6+p7+p8 + plot_layout(nrow=3,  guides = "collect")
 ```
+
 
 
 
