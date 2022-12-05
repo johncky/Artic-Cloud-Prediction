@@ -189,8 +189,9 @@ p2 = convergence_res %>%
   geom_point(aes(x=ntree, y=accuracy))+
   labs(y='Test Accuracy')
 
-p1 + p2 + plot_layout(nrow=2)+ plot_annotation(title='Convergence: Random Forest Test Performance',
+p = p1 + p2 + plot_layout(nrow=2)+ plot_annotation(title='Convergence: Random Forest Test Performance',
                                                             theme = theme(plot.title = element_text(hjust = 0.5)))
+ggsave('./pic/tree_convergence.jpg')
 ```
 ### Stability
 ```{r}
@@ -234,36 +235,64 @@ for (k in 1:5){
   plot_data = rbind(plot_data, d)
 }
 
-plot_data%>%
+p = plot_data%>%
   ggplot(aes(x = 1 - specificity, y = sensitivity, color=Fold))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
   coord_equal() + labs(
     title='Block Split: Cross Validation ROC'
   )
-
+ggsave('./pic/block_CV_ROC.jpg', p)
 ```
 
 ## Decision Boundary
 
 ```{r}
-bk_rf_pred %>% mutate(Label = factor(ifelse(Label==1, 'Cloudy', 'Cloud-free')),
+p = bk_rf_pred %>% mutate(Label = factor(ifelse(Label==1, 'Cloudy', 'Cloud-free')),
                       .pred_class = factor(ifelse(.pred_class==1, 'Cloudy', 'Cloud-free'),) )%>% conf_mat(Label, .pred_class) %>%
   autoplot(type = "heatmap") + labs(title='Confusion Matrix')+
   theme(plot.title = element_text(hjust = 0.5))
-
+ggsave('./pic/block_confusion_matrix.jpg', p)
 ```
 
 ```{r}
 #install.packages('vip')
 library(vip)
-bk_rf_fit %>% 
+p = bk_rf_fit %>% 
   extract_fit_parsnip() %>% 
   # Make VIP plot
     vip() + labs(title='Feature Importance by Impurity')+
   theme(plot.title = element_text(hjust = 0.5))
+ggsave('./pic/block_feature_importance.jpg', p)
+```
+
+## Decision Boundary
+```{r}
+
+
+l = list(NDAI = seq(min(train_data_bk$NDAI), max(train_data_bk$NDAI), length.out=100),
+         SD = seq(min(train_data_bk$SD), quantile(train_data_bk$SD,0.9), length.out=100),
+         CORR = seq(min(train_data_bk$CORR), max(train_data_bk$CORR), length.out=100))
+grid = do.call(expand.grid, l)
+grid_data  = grid %>% mutate(Rad_Df = mean(train_data_bk$Rad_Df),
+                             Rad_Cf = mean(train_data_bk$Rad_Cf),
+                             Rad_Bf = mean(train_data_bk$Rad_Bf),
+                             Rad_Af = mean(train_data_bk$Rad_Af),
+                             Rad_An = mean(train_data_bk$Rad_An))
+
+grid_pred = bk_rf_fit %>% augment(new_data=grid_data)
+
+
+#install.packages('plotly')
+library(plotly)
+grid_pred = grid_pred %>% mutate(Prediction = factor(ifelse(.pred_class==1, 'Cloud', 'No Cloud')))
+p = plot_ly(data=grid_pred, x=~NDAI,y=~SD, z=~CORR, color=~Prediction, alpha=0.01, 
+            colors=c('white', 'red')) %>%add_markers(size=1)
+p%>% layout(title = 'Random Forest: Decision Boundary')
+
 
 ```
+
 
 
 
@@ -296,7 +325,7 @@ plot_misclass = function(test_data, predictions){
                      values=c('False Positive'='red', 'False Negative'='blue'))+
         scale_fill_manual(values=my.cols)
     
-      print(p)
+      ggsave('./pic/block_misclassified.jpg')
     }
 
   }
@@ -310,29 +339,22 @@ plot_misclass(test_data_bk, bk_rf_pred)
 error_data = bk_rf_pred %>% mutate(Type = ifelse(Label==-1 & .pred_class == 1, 'False Positive', 
                                          ifelse(Label==1 & .pred_class == -1, 'False Negative', 
                                                 ifelse(Label==1 & .pred_class == 1, 'True Positive', 'True Negative' ))))
-error_data %>% pivot_longer(cols = c('.pred_-1', '.pred_1')) %>% ggplot()+
+p = error_data %>% pivot_longer(cols = c('.pred_-1', '.pred_1')) %>% ggplot()+
   geom_boxplot(aes(x = Type, y=value, fill=name)) + 
   labs(title='Test Set Predicted Probabilities By Error Type')+theme(plot.title = element_text(hjust = 0.5))
+ggsave('./pic/block_predicted_prob_type.jpg')
 ```
 
 ```{r}
-error_data %>% mutate_at(4:11, funs(c(scale(.))))  %>% filter(Type %in% c('True Positive', 'False Positive'))%>%
+p = error_data %>% mutate_at(4:11, funs(c(scale(.))))  %>% filter(Type %in% c('True Positive', 'False Positive'))%>%
   pivot_longer(4:11)%>% ggplot()+
   geom_boxplot(aes(x = name, y=value, fill=Type), outlier.size = 0.1, outlier.alpha = 0.5) + 
   labs(title='Test Set Feature Range (Standardized)')+theme(plot.title = element_text(hjust = 0.5))
+
+ggsave('./pic/block_FP_feature_range.jpg')
 ```
 
 ```{r}
-error_data %>% mutate_at(4:11, funs(c(scale(.)))) %>% filter(Type %in% c('True Negative', 'False Negative')) %>%
-  pivot_longer(4:11)%>% ggplot()+
-  geom_boxplot(aes(x = name, y=value, fill=Type), outlier.size = 0.1, outlier.alpha = 0.5) + 
-  labs(title='Test Set Feature Range By Type')+theme(plot.title = element_text(hjust = 0.5))
-```
-
-
-```{r}
-error_data 
-
 p1 = error_data%>% 
   ggplot()+
   geom_density(aes(log(NDAI), fill=Type), alpha=0.5)
@@ -372,12 +394,15 @@ p4 + p3 + plot_layout(ncol=2, guides = "collect")
 tmp = error_data %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
                              ifelse(name=='Rad_An', 2,
                                     ifelse(name=='Rad_Bf',3,
-                                           ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>% mutate(slope = lm(value ~ poly(index,2) )%>% 
+                                           ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>% mutate(deg_2_coeff = lm(value ~ poly(index,2) )%>% 
                                                                                                          .$coefficients %>% .[3] %>% as.numeric())
 
-tmp%>% 
+p = tmp%>% 
   ggplot()+
-  geom_density(aes(slope, fill=Type), alpha=0.5)
+  geom_density(aes(deg_2_coeff, fill=Type), alpha=0.5)+
+  labs(x='Degree 2 Coefficient', title='Discriminative Power of Degree 2 Coefficient')
+
+ggsave('./pic/block_deg2.jpg', p)
 ```
 
 ```{r}
@@ -385,14 +410,14 @@ new_train_data_bk = rbind(bk_split$train, bk_split$val) %>% mutate(Label = facto
                              ifelse(name=='Rad_An', 2,
                                     ifelse(name=='Rad_Bf',3,
                                            ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>%
-  mutate(slope = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value)%>% ungroup()
+  mutate(deg_2_coeff = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value)%>% ungroup()
 
 
 new_test_data_bk = bk_split$test %>% mutate(Label = factor(Label)) %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
                              ifelse(name=='Rad_An', 2,
                                     ifelse(name=='Rad_Bf',3,
                                            ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>%
-  mutate(slope = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value) %>% ungroup()
+  mutate(deg_2_coeff = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value) %>% ungroup()
 
 feature_names = new_train_data_bk %>% dplyr::select(-c(X,Y,Label, image)) %>% colnames()
 formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
@@ -409,6 +434,20 @@ new_bk_rf_pred = new_bk_rf_fit %>% augment(new_data =new_test_data_bk)
 new_bk_rf_pred%>% roc_auc(Label, `.pred_-1`)
 new_bk_rf_pred %>% accuracy(Label, .pred_class)
 ```
+
+
+```{r}
+new_bk_rf_fit %>% 
+  extract_fit_parsnip() %>% 
+  # Make VIP plot
+    vip() + labs(title='Feature Importance by Impurity')+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
 
 
 
