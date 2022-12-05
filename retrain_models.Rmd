@@ -215,8 +215,29 @@ p = rbind(kmean_lr_roc_test,
   )
 ggsave('./pic/kmeans_test_roc.jpg', p)
 
+max_pt = rbind(kmean_lr_roc_test,
+      kmean_lda_roc_test,
+      kmean_qda_roc_test,
+      kmean_rf_roc_test,
+      kmean_nb_roc_test,
+      kmean_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
 
 
+pt_data = rbind(kmean_lr_roc_test,
+      kmean_lda_roc_test,
+      kmean_qda_roc_test,
+      kmean_rf_roc_test,
+      kmean_nb_roc_test,
+      kmean_xgboost_roc_test)
+p = ggplot()+
+  geom_line(aes(x = 1 - pt_data$specificity, y = pt_data$sensitivity, color=pt_data$name))+
+  geom_path(lwd = 0.6, alpha = 0.8) +
+  geom_abline(lty = 3) +
+  geom_point(aes(x=1 - max_pt$specificity, y=max_pt$sensitivity), shape='x', color='red', size=4)+
+  coord_equal() + labs(
+    title='K-means Split: Test ROC'
+  )
+ggsave('./pic/kmeans_test_roc_cross.jpg', p)
 ```
 
 ```{r}
