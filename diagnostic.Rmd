@@ -111,11 +111,15 @@ formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + ')))
 
 
 rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=300, min_n = block_best_rf_param$min_n) %>%
-  set_engine("ranger", num.threads=12)
+  set_engine("ranger", num.threads=12, importance = "impurity")
 
 bk_rf_fit = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(rf_model)%>% fit(data = train_data_bk) 
 
-bk_rf_pred = bk_rf_fit %>% augment(new_data =test_data_bk)
+bk_rf_pred = bk_rf_fit %>% augment(new_data =test_data_bk) 
+
+bk_rf_pred%>% accuracy(Label, .pred_class)
+
+bk_rf_pred%>% roc_auc(Label, `.pred_-1`)
 
 ```
 
@@ -241,6 +245,28 @@ plot_data%>%
 ```
 
 ## Decision Boundary
+
+```{r}
+bk_rf_pred %>% mutate(Label = factor(ifelse(Label==1, 'Cloudy', 'Cloud-free')),
+                      .pred_class = factor(ifelse(.pred_class==1, 'Cloudy', 'Cloud-free'),) )%>% conf_mat(Label, .pred_class) %>%
+  autoplot(type = "heatmap") + labs(title='Confusion Matrix')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+#install.packages('vip')
+library(vip)
+bk_rf_fit %>% 
+  extract_fit_parsnip() %>% 
+  # Make VIP plot
+    vip() + labs(title='Feature Importance by Impurity')+
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
 ```{r}
 
 plot_misclass = function(test_data, predictions){
@@ -279,23 +305,45 @@ plot_misclass = function(test_data, predictions){
 plot_misclass(test_data_bk, bk_rf_pred)
 ```
 
+
 ```{r}
 error_data = bk_rf_pred %>% mutate(Type = ifelse(Label==-1 & .pred_class == 1, 'False Positive', 
                                          ifelse(Label==1 & .pred_class == -1, 'False Negative', 
                                                 ifelse(Label==1 & .pred_class == 1, 'True Positive', 'True Negative' ))))
+error_data %>% pivot_longer(cols = c('.pred_-1', '.pred_1')) %>% ggplot()+
+  geom_boxplot(aes(x = Type, y=value, fill=name)) + 
+  labs(title='Test Set Predicted Probabilities By Error Type')+theme(plot.title = element_text(hjust = 0.5))
+```
 
+```{r}
+error_data %>% mutate_at(4:11, funs(c(scale(.))))  %>% filter(Type %in% c('True Positive', 'False Positive'))%>%
+  pivot_longer(4:11)%>% ggplot()+
+  geom_boxplot(aes(x = name, y=value, fill=Type), outlier.size = 0.1, outlier.alpha = 0.5) + 
+  labs(title='Test Set Feature Range (Standardized)')+theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+error_data %>% mutate_at(4:11, funs(c(scale(.)))) %>% filter(Type %in% c('True Negative', 'False Negative')) %>%
+  pivot_longer(4:11)%>% ggplot()+
+  geom_boxplot(aes(x = name, y=value, fill=Type), outlier.size = 0.1, outlier.alpha = 0.5) + 
+  labs(title='Test Set Feature Range By Type')+theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+```{r}
+error_data 
 
 p1 = error_data%>% 
   ggplot()+
-  geom_density(aes(NDAI, fill=Type), alpha=0.5)
+  geom_density(aes(log(NDAI), fill=Type), alpha=0.5)
 
 p2 = error_data %>% 
   ggplot()+
-  geom_density(aes(CORR, fill=Type), alpha=0.5)
+  geom_density(aes(log(CORR), fill=Type), alpha=0.5)
 
 p3 = error_data %>% 
   ggplot()+
-  geom_density(aes(SD, fill=Type), alpha=0.5)
+  geom_density(aes(log(SD), fill=Type), alpha=0.5)
 
 p4 = error_data%>% 
   ggplot()+
@@ -318,14 +366,51 @@ p8 =error_data%>%
   geom_density(aes(Rad_An, fill=Type), alpha=0.5)
 
 
-p1 + p2 + plot_layout(ncol=2, guides = "collect")
+p4 + p3 + plot_layout(ncol=2, guides = "collect")
+
+
+tmp = error_data %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
+                             ifelse(name=='Rad_An', 2,
+                                    ifelse(name=='Rad_Bf',3,
+                                           ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>% mutate(slope = lm(value ~ poly(index,2) )%>% 
+                                                                                                         .$coefficients %>% .[3] %>% as.numeric())
+
+tmp%>% 
+  ggplot()+
+  geom_density(aes(slope, fill=Type), alpha=0.5)
 ```
 
 ```{r}
-error_data %>% pivot_longer(cols = c('.pred_-1', '.pred_1')) %>% ggplot()+
-  geom_boxplot(aes(x = Type, y=value, fill=name)) + 
-  labs(title='Test Set Predicted Probabilities By Error Type')+theme(plot.title = element_text(hjust = 0.5))
+new_train_data_bk = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label)) %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
+                             ifelse(name=='Rad_An', 2,
+                                    ifelse(name=='Rad_Bf',3,
+                                           ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>%
+  mutate(slope = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value)%>% ungroup()
+
+
+new_test_data_bk = bk_split$test %>% mutate(Label = factor(Label)) %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
+                             ifelse(name=='Rad_An', 2,
+                                    ifelse(name=='Rad_Bf',3,
+                                           ifelse(name=='Rad_Cf',4,5)))))%>% group_by(X, Y) %>%
+  mutate(slope = lm(value ~ poly(index,2) )%>% .$coefficients %>% .[3] %>% as.numeric()) %>% select(-index) %>% pivot_wider(names_from = name, values_from = value) %>% ungroup()
+
+feature_names = new_train_data_bk %>% dplyr::select(-c(X,Y,Label, image)) %>% colnames()
+formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
 ```
+
+```{r}
+new_rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=800, min_n = block_best_rf_param$min_n) %>%
+  set_engine("ranger", num.threads=12, importance = "impurity")
+
+new_bk_rf_fit = workflow() %>% add_recipe(recipe(formula, data = new_train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(new_rf_model)%>% fit(data = new_train_data_bk) 
+
+new_bk_rf_pred = new_bk_rf_fit %>% augment(new_data =new_test_data_bk) 
+
+new_bk_rf_pred%>% roc_auc(Label, `.pred_-1`)
+new_bk_rf_pred %>% accuracy(Label, .pred_class)
+```
+
+
 
 
 
