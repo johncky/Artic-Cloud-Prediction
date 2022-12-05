@@ -437,11 +437,12 @@ new_bk_rf_pred %>% accuracy(Label, .pred_class)
 
 
 ```{r}
-new_bk_rf_fit %>% 
+p = new_bk_rf_fit %>% 
   extract_fit_parsnip() %>% 
   # Make VIP plot
     vip() + labs(title='Feature Importance by Impurity')+
   theme(plot.title = element_text(hjust = 0.5))
+ggsave('./pic/block_deg2_feature_importance.jpg', p)
 ```
 
 
