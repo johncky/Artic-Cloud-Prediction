@@ -100,6 +100,7 @@ block_best_rf = read_rds('./data/block_rf_res.rds')$fold_loss
 block_best_rf_param = list(mtry = block_best_rf$mtry[1],
                                  min_n = block_best_rf$min_n[1])
 
+block_best_rf_param
 ```
 
 # Train Model
@@ -151,31 +152,133 @@ p
 ```
 
 ```{r}
+# 
+# trees_convergence = function(train_data, test_data, ntress, best_params){
+#   res = matrix(nrow=length(ntress), ncol = 2)
+#   i = 1
+#   for (n in ntress){
+#     print(n)
+#     rf_model = rand_forest(mode='classification', 
+#                        mtry=best_params$mtry,
+#                        trees=n,
+#                        min_n = best_params$min_n) %>%
+#       set_engine("ranger", num.threads=12)
+#     bk_rf_fit = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>%
+#       add_model(rf_model)%>% fit(data = train_data) 
+#     bk_rf_pred = bk_rf_fit %>% augment(new_data =test_data)
+#     accu = bk_rf_pred %>% accuracy(Label, .pred_class) %>% pull(.estimate)
+#     auc = bk_rf_pred %>% roc_auc(Label, '.pred_-1') %>% pull(.estimate)
+#     res[i, 1] = accu
+#     res[i, 2] = auc
+#     i = i + 1
+#   }
+#   return(tibble(accuracy=res[,1], auc=res[,2], ntree=ntress))
+#   
+# }
+# convergence_res = trees_convergence(train_data=train_data_bk, test_data = test_data_bk,
+#                                     ntress=c(10, 50, 150, 300, 500, 800, 1500, 3000, 5000), best_params = block_best_rf_param)
+```
 
-trees_convergence = function(train_data, test_data, ntress, best_params){
-  res = matrix(nrow=length(ntress), ncol = 2)
-  i = 1
-  for (n in ntress){
-    print(n)
-    rf_model = rand_forest(mode='classification', 
-                       mtry=best_params$mtry,
-                       trees=n,
-                       min_n = best_params$min_n) %>%
-      set_engine("ranger", num.threads=12)
-    bk_rf_fit = workflow() %>% add_recipe(recipe(formula, data = train_data) %>% step_normalize(all_numeric_predictors())) %>%
-      add_model(rf_model)%>% fit(data = train_data) 
-    bk_rf_pred = bk_rf_fit %>% augment(new_data =test_data)
-    accu = bk_rf_pred %>% accuracy(Label, .pred_class) %>% pull(.estimate)
-    auc = bk_rf_pred %>% roc_auc(Label, '.pred_-1') %>% pull(.estimate)
-    res[i, 1] = accu
-    res[i, 2] = auc
-    i = i + 1
-  }
-  return(tibble(accuracy=res[,1], auc=res[,2], ntree=ntress))
+```{r}
+CVmaster = function(tidymodel, train_features, training_labels, K, metrics, split_func,
+                    .scale=T, .tune_grid=NULL, excld_cols = c('X', 'Y', 'image', 'Label')){
   
+  # --------------- Create Formula ---------------
+  excld_cols = train_features %>% colnames() %>% intersect(excld_cols)
+  feature_names = train_features %>% dplyr::select(-excld_cols) %>% colnames()
+  formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + '))) 
+  
+  # ensure label is factor
+  training_labels = training_labels %>% as.factor()
+  
+  # full train data with labels
+  full_train = train_features %>% dplyr::select(feature_names) %>% mutate(Label=training_labels)
+  
+  # --------------- Create Recipe ---------------
+  model_recipe = recipe(formula, data = full_train)
+    if (.scale){
+      model_recipe = model_recipe %>% step_normalize(all_numeric_predictors())
+    }
+
+  # --------------- Create Resampler ---------------
+  cv_splits = split_func(train_features, K=K)
+  cv_settings = list(v = K, strata = FALSE, repeats = 1)
+  resample_split = list()
+  fold_id = paste('Fold ', 1:K)
+  N = dim(train_features)[1] 
+  
+  for (k in 1:K){
+    val_idx = cv_splits[[k]]
+    train_idx = seq(1, N)[-val_idx]
+    resample_split[[k]] = make_splits(list(analysis=train_idx, assessment=val_idx), data=full_train)
+  }
+  resample_settings = new_rset(splits = resample_split,
+                                ids = fold_id,
+                                subclass = c("vfold_cv", "rset"),
+                                attrib = cv_settings)
+  
+  # --------------- Create Workflow & Fit CV---------------
+  if (!is.null(.tune_grid)){
+    res = workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(tidymodel) %>%
+    tune_grid(
+      resample_settings,
+      grid=.tune_grid,
+      control=control_grid(verbose=T),
+      metrics=metrics
+    )
+  }else{
+    res = workflow() %>%
+    add_recipe(model_recipe) %>%
+    add_model(tidymodel) %>%
+    fit_resamples(resamples = resample_settings, metrics = metrics)
+  }
+
+  # --------------- Extract CV Loss---------------
+  fold_loss = data.frame()
+  for (i in 1:K){
+    fold_loss = rbind(fold_loss, res$.metrics[[i]])
+  }
+  # If there is tuning parameters, select the best one. If there are multiple metrics, the first one is used to select.
+  if (!is.null(.tune_grid)){
+    fold_loss = fold_loss %>% dplyr::filter(.config %in% (res%>%select_best(metric = "roc_auc")%>%pull(.config)))
+  }
+  
+  N_loss =  fold_loss %>% distinct(.metric)%>%pull()%>%length()
+  fold_loss = fold_loss %>% dplyr::select(-c(.config, .estimator)) %>%
+    mutate(fold = rep(1:K, each=N_loss)) %>%
+    pivot_wider(names_from = .metric, values_from = .estimate)
+  
+  output = list(fold_loss = fold_loss, 
+                avg = (fold_loss %>%  dplyr::select(-fold) %>% colMeans()),
+                workflow=res)
 }
-convergence_res = trees_convergence(train_data=train_data_bk, test_data = test_data_bk,
-                                    ntress=c(10, 50, 150, 300, 500, 800, 1500, 3000, 5000), best_params = block_best_rf_param)
+rf_model = rand_forest(mode='classification', mtry=2, trees=tune(), min_n = 6) %>% 
+  set_engine("ranger", num.threads=24)
+
+rf_res = CVmaster(rf_model,
+                  train_features = train_data_bk,
+                  training_labels = train_data_bk$Label,
+                  K = 5,
+                  split_func = Kmeans_block_split,
+                  metrics = metric_set(accuracy, roc_auc), .tune_grid = data.frame(trees=c(10, 50, 150, 300, 500, 800, 1500, 3000)))
+
+res = do.call(rbind, rf_res$workflow %>% group_by(id) %>% pull(.metrics) ) %>% group_by(trees) %>% filter(.metric=='accuracy') 
+res$Fold = fold=rep(1:8, time=5)
+p1 = res %>% group_by(trees) %>% summarise(accuracy = mean(.estimate)) %>% ggplot() + geom_point(aes(x=trees, y=accuracy))+
+  labs(y='Accuracy')
+
+res = do.call(rbind, rf_res$workflow %>% group_by(id) %>% pull(.metrics) ) %>% group_by(trees) %>% filter(.metric=='roc_auc') 
+res$Fold = fold=rep(1:8, time=5)
+p2 = res %>% group_by(trees) %>% summarise(accuracy = mean(.estimate)) %>% ggplot() + geom_point(aes(x=trees, y=accuracy))+
+  labs(y='AUC')
+
+p = p1 + p2 + plot_layout(nrow=2)+ plot_annotation(title='Block Split 5-Fold CV: Test Performance',
+                                                            theme = theme(plot.title = element_text(hjust = 0.5)))
+
+ggsave('./pic/tree_convergence.jpg', p)
+p
 ```
 
 ```{r}
@@ -355,42 +458,6 @@ ggsave('./pic/block_FP_feature_range.jpg')
 ```
 
 ```{r}
-p1 = error_data%>% 
-  ggplot()+
-  geom_density(aes(log(NDAI), fill=Type), alpha=0.5)
-
-p2 = error_data %>% 
-  ggplot()+
-  geom_density(aes(log(CORR), fill=Type), alpha=0.5)
-
-p3 = error_data %>% 
-  ggplot()+
-  geom_density(aes(log(SD), fill=Type), alpha=0.5)
-
-p4 = error_data%>% 
-  ggplot()+
-  geom_density(aes(Rad_Df, fill=Type), alpha=0.5)
-
-p5 = error_data%>% 
-  ggplot()+
-  geom_density(aes(Rad_Cf, fill=Type), alpha=0.5)
-
-p6 = error_data %>% 
-  ggplot()+
-  geom_density(aes(Rad_Bf, fill=Type), alpha=0.5)
-
-p7 = error_data %>% 
-  ggplot()+
-  geom_density(aes(Rad_Af, fill=Type), alpha=0.5)
-
-p8 =error_data%>% 
-  ggplot()+
-  geom_density(aes(Rad_An, fill=Type), alpha=0.5)
-
-
-p4 + p3 + plot_layout(ncol=2, guides = "collect")
-
-
 tmp = error_data %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=='Rad_Af', 1, 
                              ifelse(name=='Rad_An', 2,
                                     ifelse(name=='Rad_Bf',3,
@@ -400,7 +467,7 @@ tmp = error_data %>% pivot_longer(Rad_Df:Rad_An) %>% mutate(index = ifelse(name=
 p = tmp%>% 
   ggplot()+
   geom_density(aes(deg_2_coeff, fill=Type), alpha=0.5)+
-  labs(x='Degree 2 Coefficient', title='Discriminative Power of Degree 2 Coefficient')
+  labs(x='Degree 2 Coefficient', title='Density of Degree 2 Coefficient by Type')
 
 ggsave('./pic/block_deg2.jpg', p)
 ```
@@ -424,7 +491,7 @@ formula = as.formula(paste0('Label ~ ', paste(feature_names, collapse = ' + ')))
 ```
 
 ```{r}
-new_rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=800, min_n = block_best_rf_param$min_n) %>%
+new_rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=500, min_n = block_best_rf_param$min_n) %>%
   set_engine("ranger", num.threads=12, importance = "impurity")
 
 new_bk_rf_fit = workflow() %>% add_recipe(recipe(formula, data = new_train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(new_rf_model)%>% fit(data = new_train_data_bk) 
@@ -437,6 +504,7 @@ new_bk_rf_pred %>% accuracy(Label, .pred_class)
 
 
 ```{r}
+library(vip)
 p = new_bk_rf_fit %>% 
   extract_fit_parsnip() %>% 
   # Make VIP plot

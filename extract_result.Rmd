@@ -54,7 +54,8 @@ colnames(block_cv_res) = c('Fold', 'LDA', 'Logistic Regression', 'Naive Bayes',
 block_cv_res %>% colMeans()
 
 
-kmeans_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+kmeans_cv_res %>% round(3)%>% summarise(Fold = c(Fold, 'Avg'),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+  summarise(Fold = c(Fold, 'Std'),across(where(is.numeric), ~ c(., round(sqrt(var(.)),3)))) %>%
   relocate(LDA, .before = QDA)%>%
   kbl(caption = "<center><strong>K-means Split: CV Accuracy<center><strong>",
       escape = FALSE,
@@ -65,7 +66,8 @@ kmeans_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.nume
 ```
 
 ```{r}
-block_cv_res %>% round(3)%>% summarise(Fold = c(Fold, ' '),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+block_cv_res %>% round(3)%>% summarise(Fold = c(Fold, 'Avg'),across(where(is.numeric), ~ c(., round(mean(.),3)))) %>%
+  summarise(Fold = c(Fold, 'Std'),across(where(is.numeric), ~ c(., round(sqrt(var(.)),3)))) %>%
   relocate(LDA, .before = QDA)%>%
   #relocate('Logistic Regression (Reg)', .after = 'Logistic Regression')%>%
   kbl(caption = "<center><strong>Block Split: CV Accuracy<center><strong>",
