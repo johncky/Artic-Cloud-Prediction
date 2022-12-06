@@ -1,6 +1,8 @@
 README
 ================
-
+## Author
+Kwong Yu Chong (kwongyu.chong@duke.edu)
+Jiahua Wang (jiahua.wang@duke.edu)
 
 ## Reproducibility
 Randomization seed is set at the beginning of all R scripts, to ensure rproducibility of results.
