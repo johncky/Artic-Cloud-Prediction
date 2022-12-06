@@ -1,15 +1,24 @@
 README
 ================
-Jiahua Wang
-2022-12-06
+
 
 ## Reproducibility
+Randomization seed is set at the beginning of all R scripts, to ensure rproducibility of results.\
 
-The raw data used in the project is imagem1.txt, imagem2.txt, and
-imagem3.txt.  
-Codes and rationales for each part is saved in separate Rmd files.  
-Since some models are too complex that take a long training time, the
-training results are stored as rds file in data folder.  
-In order to make our work reproducible, we have set a seed at the
-beginning of our document. If the user want to check the consistency
-under randomness, they can change the seed to another.
+To reproduce results, graphs & tables in the report, do the following R scrips sequentially:\
+
+(1): Ensure there is a data folder in directory, with imagem1.txt, imagem2.txt, imagem3.txt in it\
+
+(2): Run 'EDA.R': This generates EDA figures & Tables \
+
+(3): Run 'Run_CV.R': This runs 5-fold Cross-validation on all the models, including parameter tuning. It will take some time. CV results are saved in .rds
+file inside data folder\
+
+(4): Run 'Performance.R': This loads CV results from 'Run_CV.R' which is saved in data folder, and generagte CV results & Test performance tables & figures.\
+
+(5): Run 'Diagnostic.R': This generates all the figures in Diagnostic sesction.\
+
+(6): Run 'Diagnostic2.R': This generates all the figures in Diagnostic section using K-means data split.\
+
+'CVmaster.R' contains the generic function to perform the Cross-Validation. It also contains 'block_split' & 'Kmeans_block_split' functions which
+creates the data splitting.\
