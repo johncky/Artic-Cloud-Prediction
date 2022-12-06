@@ -229,15 +229,18 @@ pt_data = rbind(kmean_lr_roc_test,
       kmean_rf_roc_test,
       kmean_nb_roc_test,
       kmean_xgboost_roc_test)
-p = ggplot()+
+p1 = ggplot()+
   geom_line(aes(x = 1 - pt_data$specificity, y = pt_data$sensitivity, color=pt_data$name))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
   geom_point(aes(x=1 - max_pt$specificity, y=max_pt$sensitivity), shape='x', color='red', size=4)+
   coord_equal() + labs(
-    title='K-means Split: Test ROC'
-  )
-ggsave('./pic/kmeans_test_roc_cross.jpg', p)
+    title='K-means Split',
+    x = '1 - specificity', y='sensitivity') +
+  theme(plot.title = element_text(hjust = 0.5), legend.position="none",  text = element_text(size = 20))
+#ggsave('./pic/kmeans_test_roc_cross.jpg', p)
+
+p1
 ```
 
 ```{r}
@@ -266,6 +269,11 @@ accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption 
       format = 'html',) %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% save_kable('./pic/kmeans_test_table.pdf')
 
+accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>K-means Split: Test Performance<center><strong>",
+      escape = FALSE,
+      format = 'html',) %>%
+  kable_classic(full_width = F, html_font = "Cambria")
+
 ```
 
 ```{r}
@@ -281,7 +289,7 @@ xgboost_model = boost_tree(tree_depth = block_best_xgboost_param$tree_depth	, tr
                            stop_iter = block_best_xgboost_param$stop_iter)%>%set_engine('xgboost') %>%set_mode('classification')
 
 
-# --------- K means Split ----------
+# --------- Block Split ----------
 train_data_bk = rbind(bk_split$train, bk_split$val) %>% mutate(Label = factor(Label))
 test_data_bk = bk_split$test %>% mutate(Label = factor(Label))
 feature_names = train_data_bk %>% dplyr::select(-c(X,Y,Label, image)) %>% colnames()
@@ -330,17 +338,38 @@ bk_xgboost_roc_test = bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) 
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
   mutate(name="XGboost - test")
 
-p = rbind(bk_lr_roc_test,
+max_pt2 = rbind(bk_lr_roc_test,
       bk_lda_roc_test,
       bk_qda_roc_test,
       bk_rf_roc_test,
       bk_nb_roc_test,
-      bk_xgboost_roc_test)%>%
-  ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
+      bk_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
+
+
+pt_data2 = rbind(bk_lr_roc_test,
+      bk_lda_roc_test,
+      bk_qda_roc_test,
+      bk_rf_roc_test,
+      bk_nb_roc_test,
+      bk_xgboost_roc_test)
+
+p2 = ggplot()+
+  geom_line(aes(x = 1 - pt_data2$specificity, y = pt_data2$sensitivity, color=pt_data2$name))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
-  coord_equal()
-ggsave('./pic/block_test_roc.jpg', p)
+  geom_point(aes(x=1 - max_pt2$specificity, y=max_pt2$sensitivity), shape='x', color='red', size=4)+
+  coord_equal() + labs(
+    title='Block Split',
+    x = '1 - specificity', y='sensitivity') +
+  theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))+
+  guides(color=guide_legend(title="Model"))
+
+
+p = p1 + p2 + plot_layout(guides = 'collect') + plot_annotation(title='Test Set ROC', theme=theme(plot.title = element_text(hjust = 0.4),
+                                                                                                  text = element_text(size = 20)))
+
+ggsave('./pic/test_roc.jpg', p,width = 20, height = 20)
+p
 ```
 
 ```{r}

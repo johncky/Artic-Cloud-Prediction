@@ -39,6 +39,16 @@ img3$image = 3
 full_img = rbind(img1, img2, img3)
 full_img_no_unlabeled = full_img %>% filter(Label!=0)
 
+## ------------------------------- Pairwise Correlation ----------------------------------
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+p = full_img %>% dplyr::select(-c(X,Y,Label, image)) %>% cor() %>%
+  corrplot::corrplot(method="color", col=col(200),  
+     diag=T,  tl.srt=45, tl.col = 'black', tl.cex = 0.75,mar=c(0,0,2,0),
+     type="upper", order="hclust", 
+     title='Feature Correlation', 
+         addCoef.col = "black",  outline=T,
+         )
+
 
 ## -------------------------------  Label % By Image Table ---------------------------------
 tbl1= full_img %>% filter(image==1) %>% group_by(Label) %>% count() %>%
@@ -456,7 +466,7 @@ baseline_accuracy = function(bk_split, kmeans_split){
   res[4,1] = block_test_accuracy
   
   res %>% kbl(
-  caption = "<center><strong>Baselien Accuracy By Split Method<center><strong>",
+  caption = "<center><strong>Baseline Accuracy By Split Method<center><strong>",
   escape = FALSE,
   format = 'html',
   table.attr = "style='width:45%;'") %>%
