@@ -2,6 +2,7 @@ README
 ================
 ## Author
 Kwong Yu Chong (kwongyu.chong@duke.edu)
+
 Jiahua Wang (jiahua.wang@duke.edu)
 
 ## Reproducibility
