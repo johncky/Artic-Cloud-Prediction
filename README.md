@@ -16,9 +16,9 @@ file inside data folder
 
 (4): Run `Performance.R`: This loads CV results from 'Run_CV.R' which is saved in data folder, and generagte CV results & Test performance tables & figures.\
 
-(5): Run `Diagnostic.R': This generates all the figures in Diagnostic sesction.
+(5): Run `Diagnostic.R`: This generates all the figures in Diagnostic sesction.
 
-(6): Run 'Diagnostic2.R`: This generates all the figures in Diagnostic section using K-means data split.
+(6): Run `Diagnostic2.R`: This generates all the figures in Diagnostic section using K-means data split.
 
 `CVmaster.R` contains the generic function to perform the Cross-Validation. It also contains 'block_split' & 'Kmeans_block_split' functions which
 creates the data splitting.
