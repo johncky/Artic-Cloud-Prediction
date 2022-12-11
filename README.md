@@ -1,3 +1,6 @@
+## Report
+`STA 521 Proj2.pdf` 
+
 ## Reproducibility
 Randomization seed is set at the beginning of all R scripts, to ensure rproducibility of results.
 
