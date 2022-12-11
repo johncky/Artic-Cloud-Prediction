@@ -1,29 +1,25 @@
----
-title: "retrain_models"
-author: "Kwong Yu Chong, Jiahua Wang"
-date: "2022-12-03"
-output: html_document
----
+list.of.packages <- c("tidyverse", "kableExtra",'patchwork', 'GGally', 'corrplot', 
+                      'RColorBrewer', 'tidymodels', 'discrim', 'ranger')
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+for (p in list.of.packages){
+  library(p, character.only = TRUE)
+}
 
-```{r}
-require(tidyverse)
-require(kableExtra)
-require(patchwork)
-require(GGally)
-require(corrplot)
-require(RColorBrewer)
-require(tidymodels)
-require(discrim)
-require(ranger)
+
+
 set.seed(666)
 
-img1 = read.table("imagem1.txt")
-img2 = read.table("imagem2.txt")
-img3 = read.table("imagem3.txt")
+
+dir.create("data",recursive = TRUE,showWarnings = FALSE)
+dir.create("pic",recursive = TRUE,showWarnings = FALSE)
+
+
+# --------------------------------- Load data ----------------------------------
+img1 = read.table("./data/imagem1.txt")
+img2 = read.table("./data/imagem2.txt")
+img3 = read.table("./data/imagem3.txt")
 
 col_name = c("Y","X","Label","NDAI","SD","CORR","Rad_Df",
              "Rad_Cf","Rad_Bf","Rad_Af","Rad_An")
@@ -99,10 +95,8 @@ set.seed(12344)
 
 kmeans_split = create_split(full_img, Kmeans_block_split, filter_unlabeled=T)
 bk_split = create_split(full_img, block_split, filter_unlabeled=T)
-```
 
 # Extract best Xgboost & Random Forest Parameters
-```{r}
 ## ------ K-means Split  ------
 kmeans_best_xgboost = read_rds('./data/Kmeans_xgboost_res.rds')$fold_loss
 kmeans_best_xgboost_param = list(min_n = kmeans_best_xgboost$min_n[1],
@@ -114,25 +108,23 @@ kmeans_best_xgboost_param = list(min_n = kmeans_best_xgboost$min_n[1],
 
 kmeans_best_rf = read_rds('./data/Kmeans_rf_res.rds')$fold_loss
 kmeans_best_rf_param = list(mtry = kmeans_best_rf$mtry[1],
-                                 min_n = kmeans_best_rf$min_n[1])
+                            min_n = kmeans_best_rf$min_n[1])
 
 
 ## ------ Block Split ------
 block_best_xgboost = read_rds('./data/block_xgboost_res.rds')$fold_loss
 block_best_xgboost_param = list(min_n = block_best_xgboost$min_n[1],
-                                 tree_depth = block_best_xgboost$tree_depth[1],
-                                 learn_rate = block_best_xgboost$learn_rate[1],
-                                 loss_reduction = block_best_xgboost$loss_reduction[1],
-                                 sample_size = block_best_xgboost$sample_size[1],
-                                 stop_iter = block_best_xgboost$stop_iter[1])
+                                tree_depth = block_best_xgboost$tree_depth[1],
+                                learn_rate = block_best_xgboost$learn_rate[1],
+                                loss_reduction = block_best_xgboost$loss_reduction[1],
+                                sample_size = block_best_xgboost$sample_size[1],
+                                stop_iter = block_best_xgboost$stop_iter[1])
 
 
 block_best_rf = read_rds('./data/block_rf_res.rds')$fold_loss
 block_best_rf_param = list(mtry = block_best_rf$mtry[1],
-                                 min_n = block_best_rf$min_n[1])
-```
+                           min_n = block_best_rf$min_n[1])
 
-```{r}
 
 # --------- Models using best params from CV result above ---------
 lr_model = logistic_reg() %>% set_engine('glm')
@@ -202,11 +194,11 @@ kmean_xgboost_roc_test = kmean_xgboost_roc_perf%>%select(Label, starts_with(".pr
   mutate(name="XGboost - test")
 
 p = rbind(kmean_lr_roc_test,
-      kmean_lda_roc_test,
-      kmean_qda_roc_test,
-      kmean_rf_roc_test,
-      kmean_nb_roc_test,
-      kmean_xgboost_roc_test)%>%
+          kmean_lda_roc_test,
+          kmean_qda_roc_test,
+          kmean_rf_roc_test,
+          kmean_nb_roc_test,
+          kmean_xgboost_roc_test)%>%
   ggplot(aes(x = 1 - specificity, y = sensitivity, color=name))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
@@ -216,34 +208,30 @@ p = rbind(kmean_lr_roc_test,
 ggsave('./pic/kmeans_test_roc.jpg', p)
 
 max_pt = rbind(kmean_lr_roc_test,
-      kmean_lda_roc_test,
-      kmean_qda_roc_test,
-      kmean_rf_roc_test,
-      kmean_nb_roc_test,
-      kmean_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
+               kmean_lda_roc_test,
+               kmean_qda_roc_test,
+               kmean_rf_roc_test,
+               kmean_nb_roc_test,
+               kmean_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
 
 
 pt_data = rbind(kmean_lr_roc_test,
-      kmean_lda_roc_test,
-      kmean_qda_roc_test,
-      kmean_rf_roc_test,
-      kmean_nb_roc_test,
-      kmean_xgboost_roc_test)
+                kmean_lda_roc_test,
+                kmean_qda_roc_test,
+                kmean_rf_roc_test,
+                kmean_nb_roc_test,
+                kmean_xgboost_roc_test)
 p1 = ggplot()+
   geom_line(aes(x = 1 - pt_data$specificity, y = pt_data$sensitivity, color=pt_data$name))+
   geom_path(lwd = 0.6, alpha = 0.8) +
   geom_abline(lty = 3) +
   geom_point(aes(x=1 - max_pt$specificity, y=max_pt$sensitivity), shape='x', color='red', size=4)+
   coord_equal() + labs(
-    title='K-means Split',
+    # title='K-means split',
     x = '1 - specificity', y='sensitivity') +
   theme(plot.title = element_text(hjust = 0.5), legend.position="none",  text = element_text(size = 20))
-#ggsave('./pic/kmeans_test_roc_cross.jpg', p)
 
-p1
-```
-
-```{r}
+### ------------------------------ Test Performance using K-means split ----------------------------------------
 accu = rbind(
   kmean_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='XGBoost'),
   kmean_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='LDA'),
@@ -251,8 +239,8 @@ accu = rbind(
   kmean_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
   kmean_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='QDA'),
   kmean_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
-  arrange(desc(.estimate))%>%mutate('Test Error' = .estimate, 'Model' = model)%>%
-  select('Model', 'Test Error') 
+  arrange(desc(.estimate))%>%mutate('Accuracy' = .estimate, 'Model' = model)%>%
+  select('Model', 'Accuracy') 
 
 auc = rbind(
   kmean_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')   %>% mutate(model='XGBoost'),
@@ -261,22 +249,36 @@ auc = rbind(
   kmean_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')   %>% mutate(model='Naive Bayes'),
   kmean_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')   %>% mutate(model='QDA'),
   kmean_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')  %>% mutate(model='Random Forest'))%>%
-  arrange(desc(.estimate))%>%mutate('Test AUC' = .estimate, 'Model' = model)%>%
-  select('Model', 'Test AUC') 
+  arrange(desc(.estimate))%>%mutate('AUC' = .estimate, 'Model' = model)%>%
+  select('Model', 'AUC') 
 
-accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>K-means Split: Test Performance<center><strong>",
-      escape = FALSE,
-      format = 'html',) %>%
-  kable_classic(full_width = F, html_font = "Cambria") %>% save_kable('./pic/kmeans_test_table.pdf')
+f_meas =  rbind(
+  kmean_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='XGBoost'),
+  kmean_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='LDA'),
+  kmean_lr_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Logistic'),
+  kmean_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
+  kmean_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='QDA'),
+  kmean_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
+  arrange(desc(.estimate))%>%mutate('F measure' = .estimate, 'Model' = model)%>%
+  select('Model', 'F measure') 
 
-accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>K-means Split: Test Performance<center><strong>",
-      escape = FALSE,
-      format = 'html',) %>%
-  kable_classic(full_width = F, html_font = "Cambria")
+kap = rbind(
+  kmean_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='XGBoost'),
+  kmean_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='LDA'),
+  kmean_lr_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Logistic'),
+  kmean_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
+  kmean_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='QDA'),
+  kmean_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
+  arrange(desc(.estimate))%>%mutate('Kappa' = .estimate, 'Model' = model)%>%
+  select('Model', 'Kappa') 
 
-```
+accu %>% left_join(auc) %>% left_join(f_meas) %>% left_join(kap) %>% mutate_if(is.numeric, ~round(., 3)) %>%
+  kbl(
+    # caption = "<center><strong>K-means Split: Test Performance<center><strong>",
+    escape = FALSE,
+    format = 'html',) %>%
+  kable_classic(full_width = F, html_font = "Cambria")  %>% save_kable(file='pic/kmeans_test_err.pdf')
 
-```{r}
 # ------ Model Params ------
 rf_model = rand_forest(mode='classification', mtry=block_best_rf_param$mtry, trees=300, min_n = block_best_rf_param$min_n) %>%
   set_engine("ranger", num.threads=12)
@@ -301,57 +303,57 @@ bk_lr_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk)
   augment(new_data = test_data_bk)
 bk_lr_roc_test =  bk_lr_roc_perf %>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="Logistic - test")
+  mutate(name="Logistic")
 
 
 bk_lda_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(lda_model)%>%
   fit(data = train_data_bk) %>% augment(new_data = test_data_bk)
 bk_lda_roc_test = bk_lda_roc_perf %>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="LDA - test")
+  mutate(name="LDA")
 
 
 bk_qda_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(qda_model)%>%
   fit(data = train_data_bk) %>% augment(new_data =test_data_bk)
 bk_qda_roc_test = bk_qda_roc_perf %>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="QDA - test")
+  mutate(name="QDA")
 
 
 bk_rf_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(rf_model)%>%
   fit(data = train_data_bk) %>% augment(new_data =test_data_bk)
 bk_rf_roc_test = bk_rf_roc_perf %>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="Random Forest - test")
+  mutate(name="Random Forest")
 
 
 bk_nb_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(NB_model)%>%
   fit(data = train_data_bk) %>% augment(new_data = test_data_bk)
 bk_nb_roc_test = bk_nb_roc_perf %>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="Naive Bayes - test")
+  mutate(name="Naive Bayes")
 
 
 bk_xgboost_roc_perf = workflow() %>% add_recipe(recipe(formula, data = train_data_bk) %>% step_normalize(all_numeric_predictors())) %>% add_model(xgboost_model)%>%
   fit(data = train_data_bk) %>% augment(new_data = test_data_bk)
 bk_xgboost_roc_test = bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>%
   yardstick::roc_curve(factor(Label),'.pred_-1') %>%
-  mutate(name="XGboost - test")
+  mutate(name="XGboost")
 
 max_pt2 = rbind(bk_lr_roc_test,
-      bk_lda_roc_test,
-      bk_qda_roc_test,
-      bk_rf_roc_test,
-      bk_nb_roc_test,
-      bk_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
+                bk_lda_roc_test,
+                bk_qda_roc_test,
+                bk_rf_roc_test,
+                bk_nb_roc_test,
+                bk_xgboost_roc_test) %>% group_by(name) %>% mutate(angle=specificity^2 + sensitivity^2) %>% filter(angle == max(angle))
 
 
 pt_data2 = rbind(bk_lr_roc_test,
-      bk_lda_roc_test,
-      bk_qda_roc_test,
-      bk_rf_roc_test,
-      bk_nb_roc_test,
-      bk_xgboost_roc_test)
+                 bk_lda_roc_test,
+                 bk_qda_roc_test,
+                 bk_rf_roc_test,
+                 bk_nb_roc_test,
+                 bk_xgboost_roc_test)
 
 p2 = ggplot()+
   geom_line(aes(x = 1 - pt_data2$specificity, y = pt_data2$sensitivity, color=pt_data2$name))+
@@ -359,20 +361,20 @@ p2 = ggplot()+
   geom_abline(lty = 3) +
   geom_point(aes(x=1 - max_pt2$specificity, y=max_pt2$sensitivity), shape='x', color='red', size=4)+
   coord_equal() + labs(
-    title='Block Split',
+    # title='Block Split',
     x = '1 - specificity', y='sensitivity') +
   theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))+
   guides(color=guide_legend(title="Model"))
 
-
-p = p1 + p2 + plot_layout(guides = 'collect') + plot_annotation(title='Test Set ROC', theme=theme(plot.title = element_text(hjust = 0.4),
-                                                                                                  text = element_text(size = 20)))
+## -------------------------------------------- Test ROC Curves ------------------------------
+p = p1 + p2 + plot_layout(guides = 'collect') + plot_annotation(
+  # title='Test Set ROC',
+  theme=theme(plot.title = element_text(hjust = 0.4),
+              text = element_text(size = 20)))
 
 ggsave('./pic/test_roc.jpg', p,width = 20, height = 20)
-p
-```
 
-```{r}
+### ------------------------------ Test Performance using Block split ----------------------------------------
 accu = rbind(
   bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='XGBoost'),
   bk_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='LDA'),
@@ -380,8 +382,8 @@ accu = rbind(
   bk_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
   bk_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='QDA'),
   bk_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::accuracy(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
-  arrange(desc(.estimate))%>%mutate('Test Accuracy' = .estimate, 'Model' = model)%>%
-  select('Model', 'Test Accuracy') 
+  arrange(desc(.estimate))%>%mutate('Accuracy' = .estimate, 'Model' = model)%>%
+  select('Model', 'Accuracy') 
 
 auc = rbind(
   bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')  %>% mutate(model='XGBoost'),
@@ -390,14 +392,32 @@ auc = rbind(
   bk_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')  %>% mutate(model='Naive Bayes'),
   bk_qda_roc_perf%>%select(Label, starts_with(".pred")) %>%yardstick::roc_auc(Label,'.pred_-1')  %>% mutate(model='QDA'),
   bk_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::roc_auc(Label,'.pred_-1')  %>% mutate(model='Random Forest'))%>%
-  arrange(desc(.estimate))%>%mutate('Test AUC' = .estimate, 'Model' = model)%>%
-  select('Model', 'Test AUC') 
+  arrange(desc(.estimate))%>%mutate('AUC' = .estimate, 'Model' = model)%>%
+  select('Model', 'AUC') 
 
-accu %>% left_join(auc) %>% mutate_if(is.numeric, ~round(., 3)) %>% kbl(caption = "<center><strong>Block Split: Test Performance<center><strong>",
-      escape = FALSE,
-      format = 'html',) %>%
+f_meas =  rbind(
+  bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='XGBoost'),
+  bk_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='LDA'),
+  bk_lr_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Logistic'),
+  bk_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
+  bk_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='QDA'),
+  bk_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::f_meas(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
+  arrange(desc(.estimate))%>%mutate('F measure' = .estimate, 'Model' = model)%>%
+  select('Model', 'F measure') 
+
+kap = rbind(
+  bk_xgboost_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='XGBoost'),
+  bk_lda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='LDA'),
+  bk_lr_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Logistic'),
+  bk_nb_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Naive Bayes'),
+  bk_qda_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='QDA'),
+  bk_rf_roc_perf%>%select(Label, starts_with(".pred")) %>% yardstick::kap(Label,'.pred_class')  %>% mutate(model='Random Forest'))%>%
+  arrange(desc(.estimate))%>%mutate('Kappa' = .estimate, 'Model' = model)%>%
+  select('Model', 'Kappa') 
+
+accu %>% left_join(auc) %>% left_join(f_meas) %>% left_join(kap) %>% mutate_if(is.numeric, ~round(., 3)) %>% 
+  kbl(
+    # caption = "<center><strong>Block Split: Test Performance<center><strong>",
+    escape = FALSE,
+    format = 'html',) %>%
   kable_classic(full_width = F, html_font = "Cambria") %>% save_kable('./pic/block_test_table.pdf')
-
-
-
-```
