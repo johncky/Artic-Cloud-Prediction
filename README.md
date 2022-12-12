@@ -1,6 +1,12 @@
 ## Report
 `STA 521 Proj2.pdf`: [Click here](https://github.com/johncky/Artic-Cloud-Prediction/edit/main/STA%20521%20Proj2.pdf)
 
+- Block splitting method in spatial data with spatial strcuture
+- First order importance
+- EDA
+- Modeling
+- Model diagnostics
+
 ## Reproducibility
 Randomization seed is set at the beginning of all R scripts, to ensure rproducibility of results.
 
