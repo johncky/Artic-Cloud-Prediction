@@ -1,5 +1,5 @@
 ## Report
-`STA 521 Proj2.pdf`: [Click here](https://github.com/johncky/Artic-Cloud-Prediction/edit/main/STA_521_Proj2.pdf)
+`STA 521 Proj2.pdf`: [Click here](https://github.com/johncky/Artic-Cloud-Prediction/edit/main/STA%20521%20Proj2.pdf)
 
 ## Reproducibility
 Randomization seed is set at the beginning of all R scripts, to ensure rproducibility of results.
