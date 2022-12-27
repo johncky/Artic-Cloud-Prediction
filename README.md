@@ -1,5 +1,5 @@
 ## Report
-`STA 521 Proj2.pdf`: [Click here](https://github.com/johncky/Artic-Cloud-Prediction/blob/main/STA%20521%20Proj2.pdf)
+[STA 521 Proj2.pdf](https://github.com/johncky/Artic-Cloud-Prediction/blob/main/STA%20521%20Proj2.pdf)
 
 - Block splitting method in spatial data with spatial strcuture
 - First order importance
